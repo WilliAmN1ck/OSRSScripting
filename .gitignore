@@ -1,0 +1,20 @@
+# Build outputs
+/build/
+**/build/
+.gradle/
+/out/
+**/out/
+
+# IDE
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime / persisted script state / secrets
+/local/
+*.local.json

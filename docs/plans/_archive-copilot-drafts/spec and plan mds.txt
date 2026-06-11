@@ -1,0 +1,238 @@
+Phase 1 Repository Scaffold Tasks
+1. Create repository root files
+Path: /settings.gradle.kts
+
+Content:
+
+kotlin
+rootProject.name = "osrs-scripts-suite"
+include("commons", "script-template", "script-miner", "script-lumbridge-killer")
+Acceptance: git status shows file added.
+
+Path: /build.gradle.kts
+
+Content:
+
+kotlin
+plugins { `java` }
+allprojects {
+  repositories { mavenCentral() }
+}
+java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
+Acceptance: ./gradlew -v shows Gradle runs; ./gradlew tasks lists tasks.
+
+Path: /gradle.properties
+
+Content:
+
+Code
+org.gradle.jvmargs=-Xmx2g
+tribot.sdk.version=1.0.0
+Acceptance: File present.
+
+Path: /.gitignore
+
+Content:
+
+Code
+/build/
+/.gradle/
+/out/
+/*.iml
+Acceptance: File present.
+
+2. Add top-level README and LICENSE
+Path: /README.md
+
+Content snippet:
+
+md
+# osrs-scripts-suite
+
+**Closed-source** Tribot Automation SDK scripts.
+
+**Warning:** Using automation clients violates Jagex rules and may lead to account bans. Use at your own risk.
+Path: /LICENSE — add chosen closed-source notice or internal license text.
+
+Acceptance: Files committed.
+
+3. Create module directories and minimal build files
+Paths:
+
+commons/
+
+script-template/
+
+script-miner/
+
+script-lumbridge-killer/
+
+For each module add: build.gradle.kts with:
+
+kotlin
+plugins { `java-library` }
+dependencies { testImplementation("org.junit.jupiter:junit-jupiter:5.9.3") }
+java { withSourcesJar() }
+Acceptance: settings.gradle.kts includes modules and directories exist.
+
+4. Add top-level CI placeholder
+Path: .github/workflows/ci.yml
+
+Content snippet:
+
+yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { java-version: '17' }
+      - name: Build
+        run: ./gradlew build --no-daemon
+Acceptance: Workflow file present; will run on next push.
+
+Phase 2 Commons Module, Script Template, and CI Tasks
+Commons Module Tasks
+Create Logger utility
+
+Path: commons/src/main/java/com/osrs/commons/Logger.java
+
+Content:
+
+java
+package com.osrs.commons;
+import java.time.Instant;
+public final class Logger {
+  public static void info(String msg) { System.out.println(Instant.now() + " INFO: " + msg); }
+  public static void error(String msg) { System.err.println(Instant.now() + " ERROR: " + msg); }
+}
+Acceptance: ./gradlew :commons:compileJava succeeds.
+
+Create ConfigLoader
+
+Path: commons/src/main/java/com/osrs/commons/ConfigLoader.java
+
+Content:
+
+java
+package com.osrs.commons;
+import java.nio.file.*;
+import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+public class ConfigLoader {
+  public static Map<String,Object> load(Path p) throws Exception {
+    ObjectMapper m = new ObjectMapper();
+    return m.readValue(Files.readAllBytes(p), Map.class);
+  }
+}
+Add dependency: implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2") in commons/build.gradle.kts.
+
+Acceptance: ./gradlew :commons:test passes a simple test.
+
+Add SafeSleep helper
+
+Path: commons/src/main/java/com/osrs/commons/SafeSleep.java
+
+Content:
+
+java
+package com.osrs.commons;
+public final class SafeSleep {
+  public static void ms(long ms) {
+    try { Thread.sleep(ms); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+  }
+}
+Acceptance: Compiles.
+
+Unit test for ConfigLoader
+
+Path: commons/src/test/java/com/osrs/commons/ConfigLoaderTest.java
+
+Content: minimal JUnit test that writes a temp JSON and asserts load returns expected key.
+
+Acceptance: ./gradlew :commons:test passes.
+
+Script Template Tasks
+Create Automation SDK entrypoint skeleton
+
+Path: script-template/src/main/java/com/osrs/template/TemplateScript.java
+
+Content:
+
+java
+package com.osrs.template;
+import com.osrs.commons.Logger;
+public class TemplateScript {
+  public static void main(String[] args) {
+    Logger.info("TemplateScript starting with args: " + String.join(" ", args));
+    // Automation SDK entrypoint wiring will go here
+  }
+}
+Acceptance: ./gradlew :script-template:build succeeds.
+
+Add metadata file
+
+Path: script-template/src/main/resources/META-INF/tribot-script.json
+
+Content:
+
+json
+{ "name":"TemplateScript", "version":"0.1.0", "entry":"com.osrs.template.TemplateScript" }
+Acceptance: JAR contains META-INF/tribot-script.json after ./gradlew :script-template:jar.
+
+Add fat JAR task
+
+Path: script-template/build.gradle.kts — add Shadow plugin:
+
+kotlin
+plugins { id("com.github.johnrengelman.shadow") version "8.1.1" }
+tasks.named("shadowJar") { archiveBaseName.set("script-template-all") }
+Acceptance: ./gradlew :script-template:shadowJar produces build/libs/script-template-all-*.jar.
+
+CI and Artifact Tasks
+Complete CI to run tests and build shadow jars
+
+Path: .github/workflows/ci.yml — extend build step to run ./gradlew build shadowJar.
+
+Acceptance: On next push, CI runs build and tests.
+
+Add deployLocally task for modules
+
+Path: script-template/build.gradle.kts (and copy to other script modules)
+
+Content snippet:
+
+kotlin
+tasks.register<Copy>("deployLocally") {
+  dependsOn("shadowJar")
+  from("$buildDir/libs")
+  into(System.getProperty("user.home") + "/.tribot/automations")
+}
+Acceptance: ./gradlew :script-template:deployLocally copies jar to ~/.tribot/automations.
+
+Verification Steps and Acceptance Criteria
+Phase 1 acceptance: ./gradlew tasks runs; modules present; README and LICENSE committed.
+
+Phase 2 acceptance:
+
+./gradlew :commons:test passes.
+
+./gradlew :script-template:shadowJar produces fat JAR.
+
+./gradlew :script-template:deployLocally copies JAR to ~/.tribot/automations.
+
+CI workflow file present and configured to run ./gradlew build.
+
+Verification commands
+
+./gradlew :commons:test
+
+./gradlew :script-template:shadowJar
+
+./gradlew :script-template:deployLocally
+
+Check ~/.tribot/automations for the JAR.

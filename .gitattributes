@@ -1,0 +1,10 @@
+# Normalize text files to LF in the repository.
+* text=auto
+
+# Windows batch scripts need CRLF; the Gradle shell wrapper needs LF.
+*.bat text eol=crlf
+gradlew text eol=lf
+
+# Treat the wrapper jar (and other binaries) as binary — never convert.
+*.jar binary
+*.zip binary
