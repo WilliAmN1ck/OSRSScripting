@@ -32,7 +32,7 @@
 - [x] 3a Module skeleton: ge-flipper wired to org.tribot.dev + trivial TribotScript; build + fatJar verified (daemon on JDK 21)
 - [x] 3b GeClient port + SdkGeClient adapter + FlipActionExecutor; FlipEngine wired via TaskRunner (EnsureGeOpenTask + FlipTask) in execute(); 13 tests green, build + fatJar verified
 - [ ] 3c Config UI + persistence + breaks — branch `phase-3c-config-persistence`; spec + plan approved (docs/plans/phase-3-ge-flipper/{spec,plan}-3c-config-persistence.md)
-  - [ ] 3c.1 StockLedger (core, TDD)
+  - [x] 3c.1 StockLedger (core, TDD) — 5 tests green
   - [ ] 3c.2 OfferTracker (core, TDD) — stamps placedAt, fixes never-called recordPurchase, profit accounting
   - [ ] 3c.3 PersistedState v2 (stockEntries + offerStamps; v1-compat)
   - [ ] 3c.4 FlipTask integration (stamped offers, stock filter, Supplier<FlipConfig>, per-tick persist)
