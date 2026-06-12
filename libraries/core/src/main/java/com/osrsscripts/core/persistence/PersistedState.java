@@ -36,7 +36,17 @@ public final class PersistedState {
     }
 
     private static <T> List<T> copyOrEmpty(List<T> entries) {
-        return entries == null ? new ArrayList<>() : new ArrayList<>(entries);
+        List<T> copy = new ArrayList<>();
+        if (entries != null) {
+            for (T entry : entries) {
+                // Hand-edited or damaged JSON can hold null elements; dropping them here keeps
+                // the fail-safe contract (load never produces state that NPEs during restore).
+                if (entry != null) {
+                    copy.add(entry);
+                }
+            }
+        }
+        return copy;
     }
 
     public static PersistedState empty() {

@@ -134,10 +134,12 @@ public final class FlipperPanel extends JPanel {
 
     private FlipConfig parseFields() {
         long maxOfferAgeMinutes = parseLong(Field.MAX_OFFER_AGE_MINUTES, 1);
-        int maxSlots = (int) parseLong(Field.MAX_SLOTS, 1);
-        if (maxSlots > 8) {
+        // Bound-check before narrowing: a value past Integer.MAX_VALUE would wrap negative.
+        long maxSlotsValue = parseLong(Field.MAX_SLOTS, 1);
+        if (maxSlotsValue > 8) {
             throw new IllegalArgumentException(Field.MAX_SLOTS.label + " must be 1-8");
         }
+        int maxSlots = (int) maxSlotsValue;
         return FlipConfig.builder()
                 .capitalCap(parseLong(Field.CAPITAL_CAP, 0))
                 .perItemCapitalCap(parseLong(Field.PER_ITEM_CAPITAL_CAP, 0))

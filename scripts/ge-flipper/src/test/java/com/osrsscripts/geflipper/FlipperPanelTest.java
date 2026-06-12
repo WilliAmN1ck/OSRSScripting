@@ -69,6 +69,11 @@ class FlipperPanelTest {
         panel.setField(FlipperPanel.Field.MIN_MARGIN_PCT, "-0.5");
         panel.clickApply();
         assertTrue(applied.isEmpty(), "negative margins are invalid");
+
+        panel.setField(FlipperPanel.Field.MIN_MARGIN_PCT, "0.01");
+        panel.setField(FlipperPanel.Field.MAX_SLOTS, "2147483656");
+        panel.clickApply();
+        assertTrue(applied.isEmpty(), "int-overflowing slot counts must not bypass the 1-8 bound");
     }
 
     @Test

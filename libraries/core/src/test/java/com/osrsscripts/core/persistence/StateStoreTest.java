@@ -46,6 +46,21 @@ class StateStoreTest {
     }
 
     @Test
+    void nullListElementsAreDroppedOnLoad(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("state.json");
+        // Valid JSON, semantically broken: must fail safe, not NPE later during restore.
+        Files.write(file, ("{\"ledgerEntries\":[null],\"stockEntries\":[null,"
+                + "{\"itemId\":4151,\"qty\":3,\"pricePerItem\":100}],"
+                + "\"offerStamps\":[null],\"realizedProfit\":0,\"flipsCompleted\":0}").getBytes());
+
+        PersistedState loaded = new StateStore(file).load();
+
+        assertTrue(loaded.ledgerEntries().isEmpty());
+        assertTrue(loaded.offerStamps().isEmpty());
+        assertEquals(1, loaded.stockEntries().size());
+    }
+
+    @Test
     void missingFileLoadsEmpty(@TempDir Path dir) {
         StateStore store = new StateStore(dir.resolve("does-not-exist.json"));
         assertEquals(PersistedState.empty(), store.load());

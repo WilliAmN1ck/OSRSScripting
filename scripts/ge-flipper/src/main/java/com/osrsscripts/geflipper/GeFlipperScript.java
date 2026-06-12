@@ -88,8 +88,9 @@ public final class GeFlipperScript implements TribotScript {
                 context.getWaiting().sleep(TICK_INTERVAL_MS);
             }
         } finally {
-            context.getSidebar().removeSidebarTab(TAB_NAME);
+            // Save first: a failure tearing down the sidebar must not cost us the final state.
             persister.accept(StateMapper.snapshot(ledger, stock, tracker));
+            context.getSidebar().removeSidebarTab(TAB_NAME);
         }
     }
 
