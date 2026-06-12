@@ -1,6 +1,7 @@
 package com.osrsscripts.core.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,11 +18,31 @@ class StateStoreTest {
         PersistedState original = new PersistedState(
                 Arrays.asList(new LedgerEntry(561, 100, 1_700_000_000_000L),
                         new LedgerEntry(4151, 1, 1_700_000_500_000L)),
+                Arrays.asList(new StockEntry(4151, 3, 100_000L)),
+                Arrays.asList(new OfferStampEntry(1, 4151, "SELL", 150_000L, 2,
+                        1_700_000_600_000L)),
                 123_456L, 7L);
 
         store.save(original);
 
         assertEquals(original, store.load());
+    }
+
+    @Test
+    void v1FileWithoutNewFieldsLoadsThemEmpty(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("state.json");
+        // The 3c-era schema before stockEntries/offerStamps existed.
+        Files.write(file, ("{\"ledgerEntries\":[{\"itemId\":561,\"qty\":100,"
+                + "\"epochMillis\":1700000000000}],"
+                + "\"realizedProfit\":42,\"flipsCompleted\":3}").getBytes());
+
+        PersistedState loaded = new StateStore(file).load();
+
+        assertEquals(1, loaded.ledgerEntries().size());
+        assertEquals(42L, loaded.realizedProfit());
+        assertEquals(3L, loaded.flipsCompleted());
+        assertTrue(loaded.stockEntries().isEmpty());
+        assertTrue(loaded.offerStamps().isEmpty());
     }
 
     @Test

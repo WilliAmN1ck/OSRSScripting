@@ -33,7 +33,7 @@
 - [x] 3b GeClient port + SdkGeClient adapter + FlipActionExecutor; FlipEngine wired via TaskRunner (EnsureGeOpenTask + FlipTask) in execute(); 13 tests green, build + fatJar verified
 - [ ] 3c Config UI + persistence + breaks — branch `phase-3c-config-persistence`; spec + plan approved (docs/plans/phase-3-ge-flipper/{spec,plan}-3c-config-persistence.md)
   - [x] 3c.1 StockLedger (core, TDD) — 5 tests green
-  - [ ] 3c.2 OfferTracker (core, TDD) — stamps placedAt, fixes never-called recordPurchase, profit accounting
+  - [x] 3c.2 OfferTracker (core, TDD) — 9 tests green; fixes never-called recordPurchase
   - [ ] 3c.3 PersistedState v2 (stockEntries + offerStamps; v1-compat)
   - [ ] 3c.4 FlipTask integration (stamped offers, stock filter, Supplier<FlipConfig>, per-tick persist)
   - [ ] 3c.5 Break guard (BreakSource port, BreakIdleTask)
