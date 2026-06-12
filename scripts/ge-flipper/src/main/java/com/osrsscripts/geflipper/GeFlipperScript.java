@@ -5,6 +5,8 @@ import com.osrsscripts.core.ge.FlipEngine;
 import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
+import com.osrsscripts.core.ge.OfferTracker;
+import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.prices.WikiPriceClient;
 import com.osrsscripts.core.task.Task;
@@ -36,12 +38,15 @@ public final class GeFlipperScript implements TribotScript {
         FlipEngine engine = new FlipEngine();
         GeTax tax = new GeTax(GeTaxRules.defaults());
         BuyLimitLedger ledger = new BuyLimitLedger();
+        StockLedger stock = new StockLedger();
+        OfferTracker tracker = new OfferTracker(ledger, stock, tax);
         FlipConfig config = defaultConfig();
         FlipActionExecutor executor = new FlipActionExecutor(client);
 
         List<Task> tasks = List.of(
                 new EnsureGeOpenTask(client),
-                new FlipTask(client, prices, scanner, engine, tax, ledger, config, executor));
+                new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
+                        () -> config, executor, state -> { }));
         TaskRunner runner = new TaskRunner(tasks);
 
         while (!Thread.currentThread().isInterrupted()) {
