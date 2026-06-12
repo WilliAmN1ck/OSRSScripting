@@ -1,5 +1,8 @@
 plugins {
     kotlin("jvm") version "2.1.21"
+    // Intentionally `latest.release`: keeps the compile-time SDK in lockstep with Echo's
+    // runtime, so signature drift surfaces as a compile error here rather than a silent
+    // NoSuchMethodError in-game. Pin a version only when targeting a specific Echo release.
     id("org.tribot.dev") version "latest.release"
 }
 

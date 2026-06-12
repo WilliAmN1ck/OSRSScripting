@@ -40,13 +40,15 @@ requires at least JVM runtime version 21"). Our situation:
 
 - JDK 11 → rejected by the plugin.
 - JDK 26 → too new for Gradle 8.10.2 to run on (version-parse failure).
-- **JDK 21 → works.** Used the foojay-provisioned Temurin 21 as `JAVA_HOME`:
-  `C:\Users\Nikras\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2`.
+- **JDK 21 → works.**
 
-**Recommendation:** install a stable **JDK 21** and point `JAVA_HOME` at it for local builds
-(relying on the provisioned-toolchain path is fragile). **CI is unaffected** — it already runs
-on Temurin 21. The cold-cache TLS workaround (`JAVA_TOOL_OPTIONS`) is only needed when JitPack
-artifacts are fetched fresh.
+**Automated guardrail:** `gradle/gradle-daemon-jvm.properties` (`toolchainVersion=21`, via
+`./gradlew updateDaemonJvm --jvm-version=21`) now makes the wrapper **auto-select a JDK 21
+daemon regardless of `JAVA_HOME`** — verified by building with `JAVA_HOME` on JDK 11 and the
+daemon still running on 21. A JDK 21 must be installed/discoverable (we have the
+foojay-provisioned Temurin 21); installing a stable JDK 21 is still recommended so discovery
+never misses. **CI is unaffected** (already Temurin 21). The cold-cache TLS workaround
+(`JAVA_TOOL_OPTIONS`) is only needed when JitPack artifacts are fetched fresh.
 
 ## What the Next PR Does (executor)
 
@@ -59,7 +61,6 @@ artifacts are fetched fresh.
 
 ## Verification Commands
 
-    $env:JAVA_HOME = "C:\Users\Nikras\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2"  # any JDK 21
-    .\gradlew.bat :scripts:ge-flipper:build
+    .\gradlew.bat :scripts:ge-flipper:build    # daemon auto-runs on JDK 21 via the criteria file
     .\gradlew.bat :scripts:ge-flipper:fatJar   # -> scripts/ge-flipper/build/libs/ge-flipper.jar
     # add JAVA_TOOL_OPTIONS (Windows-ROOT + TLSv1.2) only on a cold dependency cache
