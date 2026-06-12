@@ -52,6 +52,30 @@ Download the CLI (TRiBot Downloads page), extract, then:
   launches for the rest; not a blocker.
 - **Capture:** the CLI's stdout either way.
 
+**Optional flags for a fully hands-off launch:**
+
+- **Account login** — pick one:
+  - `--jagex-character-name "<name>"` (or `--jagex-character-id <id>`) — uses the account
+    saved in the launcher's account manager; preferred, no credentials on the command line.
+  - `--legacy-username "<email>" --legacy-password-raw "<password>"` — bypasses the account
+    manager. Add `--legacy-totp-raw "<code>"` if the account has TOTP 2FA. **Raw
+    credentials land in your PowerShell history** (`%APPDATA%\Microsoft\Windows\PowerShell\
+    PSReadLine\ConsoleHost_history.txt`) — fine for the throwaway account, but don't use
+    this form for anything you care about.
+- **Break profile** — `--break-profile-name "<profile>"` applies a launcher-defined break
+  profile at startup; define a short near-immediate break profile first and this doubles
+  as the setup for item 7.
+- **Resource/window** — `--heap-mb 1024` (JVM heap), `--fps-limit 20` and
+  `--render-distance 10` (lighter client for soak runs), `--minimized` (start minimized;
+  useful for item 9, but keep it visible for items 3–8 since you're observing).
+- `--no-update` skips the CLI self-update check on repeat launches.
+
+Full example:
+
+    .\tribot.exe run --script-name "GE Flipper" `
+        --jagex-character-name "<character>" --world <world> `
+        --break-profile-name "short-test" --heap-mb 1024 --fps-limit 20
+
 ## 3. Sidebar  *(gate)*
 
 With the script running:
