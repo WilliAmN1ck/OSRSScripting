@@ -20,7 +20,7 @@ This software is provided for educational purposes only; use at your own risk.
 
     ./gradlew build                 # compile + test everything
 
-Requires JDK 11 (provisioned via Gradle toolchains).
+Requires JDK 21 (provisioned via Gradle toolchains).
 
 ## Planning
 
