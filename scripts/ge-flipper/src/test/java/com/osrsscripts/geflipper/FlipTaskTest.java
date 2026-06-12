@@ -10,13 +10,22 @@ import com.osrsscripts.core.ge.FlipEngine;
 import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
+import com.osrsscripts.core.ge.OfferTracker;
+import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.model.FlipConfig;
+import com.osrsscripts.core.model.GeOffer;
+import com.osrsscripts.core.model.OfferSide;
+import com.osrsscripts.core.model.OfferStatus;
+import com.osrsscripts.core.persistence.PersistedState;
 import com.osrsscripts.core.prices.HttpFetcher;
 import com.osrsscripts.core.prices.WikiPriceClient;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class FlipTaskTest {
@@ -28,12 +37,16 @@ class FlipTaskTest {
     private final FlipEngine engine = new FlipEngine();
     private final GeTax tax = new GeTax(GeTaxRules.defaults());
     private final BuyLimitLedger ledger = new BuyLimitLedger();
+    private final StockLedger stock = new StockLedger();
+    private final OfferTracker tracker = new OfferTracker(ledger, stock, tax);
+    private final AtomicReference<FlipConfig> config = new AtomicReference<>(buyingConfig());
+    private final List<PersistedState> persisted = new ArrayList<>();
 
     private FlipTask task(HttpFetcher fetcher) {
         WikiPriceClient prices = new WikiPriceClient(
                 fetcher, Clock.systemUTC(), BASE_URL, Duration.ofMinutes(5), Duration.ofHours(6));
-        return new FlipTask(client, prices, scanner, engine, tax, ledger, buyingConfig(),
-                new FlipActionExecutor(client));
+        return new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
+                config::get, new FlipActionExecutor(client), persisted::add);
     }
 
     private static FlipConfig buyingConfig() {
@@ -83,6 +96,86 @@ class FlipTaskTest {
 
         assertTrue(client.buys.isEmpty(), "no actions on a failed market fetch");
         assertEquals(0, client.collectCalls);
+    }
+
+    @Test
+    void staleTrackedOfferIsCancelled() {
+        client.open = true;
+        client.coins = 0L;
+        GeOffer live = new GeOffer(1, OfferStatus.ACTIVE, OfferSide.BUY, 100, 100L, 10, 0, null);
+        client.offers = OfferMapper.fillEightSlots(List.of(live));
+
+        // The tracker remembers this offer being placed an hour ago; maxOfferAge is 30 min.
+        tracker.restore(List.of(new OfferTracker.Stamp(1, 100, OfferSide.BUY, 100L, 0,
+                Instant.now().minus(Duration.ofHours(1)))), 0L, 0L);
+
+        task(new CannedFetcher()).execute();
+
+        assertEquals(List.of(1), client.aborts);
+    }
+
+    @Test
+    void freshOfferIsNotCancelled() {
+        client.open = true;
+        client.coins = 0L;
+        GeOffer live = new GeOffer(1, OfferStatus.ACTIVE, OfferSide.BUY, 100, 100L, 10, 0, null);
+        client.offers = OfferMapper.fillEightSlots(List.of(live));
+
+        task(new CannedFetcher()).execute(); // first sight: stamped now
+
+        assertTrue(client.aborts.isEmpty());
+    }
+
+    @Test
+    void onlyFlipperBoughtStockIsSold() {
+        client.open = true;
+        client.coins = 0L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        client.stock.put(100, 5); // in inventory…
+
+        task(new CannedFetcher()).execute();
+        assertTrue(client.sells.isEmpty(), "pre-owned items are never offered");
+
+        stock.recordBuy(100, 3, 100L); // …but only 3 were bought by the flipper
+        task(new CannedFetcher()).execute();
+
+        assertEquals(1, client.sells.size());
+        assertArrayEquals(new int[] {100, 200, 3}, client.sells.get(0));
+    }
+
+    @Test
+    void persisterRunsOnlyOnTicksThatActed() {
+        client.open = true;
+        client.coins = 0L; // nothing affordable, nothing owned: no actions
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        FlipTask task = task(new CannedFetcher());
+        task.execute();
+        assertTrue(persisted.isEmpty(), "no actions, no save");
+
+        client.coins = 1_000L; // now a buy happens
+        task.execute();
+        assertEquals(1, persisted.size());
+    }
+
+    @Test
+    void configChangesApplyOnTheNextTick() {
+        client.open = true;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        // Margin bar nobody clears: no buys.
+        config.set(FlipConfig.builder()
+                .capitalCap(1_000_000L).perItemCapitalCap(1_000_000L)
+                .minMarginGp(1_000_000L).minMarginPct(0.0).minVolume(0L)
+                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30)).build());
+        FlipTask task = task(new CannedFetcher());
+        task.execute();
+        assertTrue(client.buys.isEmpty());
+
+        config.set(buyingConfig());
+        task.execute();
+        assertEquals(1, client.buys.size());
     }
 
     /** Serves the three wiki endpoints for a single profitable item (id 100, buy 100 / sell 200). */

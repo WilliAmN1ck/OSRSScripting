@@ -13,7 +13,7 @@ repositories {
 }
 
 tribot {
-    // No in-client GUI yet; enable when we build the config panel.
+    // The config panel is plain Swing (Sidebar.addSidebarTab takes a JPanel); Compose stays off.
     useCompose = false
 
     scripts {
@@ -39,4 +39,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// The dev plugin's fatJar reads the bundled project's jar without declaring the task
+// dependency; Gradle fails the build when both are scheduled together (e.g. `build fatJar`).
+// (Configured lazily: the plugin registers fatJar after project evaluation.)
+tasks.matching { it.name == "fatJar" }.configureEach {
+    dependsOn(":libraries:core:jar")
 }
