@@ -48,6 +48,11 @@ public final class FlipScanner {
                 continue;
             }
             ItemMeta meta = mapping.get(itemId);
+            // Unknown membership is treated as members: on F2P a rejected offer would be
+            // retried forever, so only items known to be free-to-play pass the filter.
+            if (!config.membersItemsAllowed() && (meta == null || meta.members())) {
+                continue;
+            }
             int buyLimit = meta != null ? meta.buyLimit() : 0;
 
             candidates.add(new FlipCandidate(itemId, buyPrice, sellPrice, margin, volume, buyLimit,

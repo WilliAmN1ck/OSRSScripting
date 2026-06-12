@@ -77,6 +77,19 @@ class FlipperPanelTest {
     }
 
     @Test
+    void membersCheckboxFlowsIntoTheConfig() {
+        List<FlipConfig> applied = new ArrayList<>();
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add);
+
+        panel.clickApply();
+        assertTrue(applied.get(0).membersItemsAllowed(), "default config allows members items");
+
+        panel.setMembersAllowed(false);
+        panel.clickApply();
+        assertFalse(applied.get(1).membersItemsAllowed());
+    }
+
+    @Test
     void errorClearsOnTheNextSuccessfulApply() {
         List<FlipConfig> applied = new ArrayList<>();
         FlipperPanel panel = new FlipperPanel(initial(), applied::add);

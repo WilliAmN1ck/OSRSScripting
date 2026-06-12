@@ -14,6 +14,7 @@ public final class FlipConfig {
     private final long minVolume;
     private final int maxSlots;
     private final Duration maxOfferAge;
+    private final boolean membersItemsAllowed;
 
     private FlipConfig(Builder b) {
         this.capitalCap = b.capitalCap;
@@ -23,6 +24,7 @@ public final class FlipConfig {
         this.minVolume = b.minVolume;
         this.maxSlots = b.maxSlots;
         this.maxOfferAge = b.maxOfferAge;
+        this.membersItemsAllowed = b.membersItemsAllowed;
     }
 
     /**
@@ -63,6 +65,14 @@ public final class FlipConfig {
         return maxOfferAge;
     }
 
+    /**
+     * Whether members items may be flipped. Disable on a free-to-play account, where the GE
+     * rejects offers for members items.
+     */
+    public boolean membersItemsAllowed() {
+        return membersItemsAllowed;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -75,6 +85,7 @@ public final class FlipConfig {
         private long minVolume = 0L;
         private int maxSlots = 8;
         private Duration maxOfferAge = Duration.ofMinutes(30);
+        private boolean membersItemsAllowed = true;
 
         /** Required for buying: leaving this at the default {@code 0} disables all buy offers. */
         public Builder capitalCap(long v) {
@@ -109,6 +120,11 @@ public final class FlipConfig {
 
         public Builder maxOfferAge(Duration v) {
             this.maxOfferAge = v;
+            return this;
+        }
+
+        public Builder membersItemsAllowed(boolean v) {
+            this.membersItemsAllowed = v;
             return this;
         }
 

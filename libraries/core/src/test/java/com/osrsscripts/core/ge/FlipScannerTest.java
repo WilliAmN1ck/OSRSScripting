@@ -24,7 +24,7 @@ class FlipScannerTest {
     private Map<Integer, ItemMeta> mapping() {
         Map<Integer, ItemMeta> m = new HashMap<>();
         m.put(100, new ItemMeta(100, "A", false, 1000));
-        m.put(200, new ItemMeta(200, "B", false, 100));
+        m.put(200, new ItemMeta(200, "B", true, 100)); // members item
         m.put(300, new ItemMeta(300, "C", false, 5000));
         return m;
     }
@@ -69,6 +69,22 @@ class FlipScannerTest {
         List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
         assertEquals(1, result.size());
         assertEquals(100, result.get(0).itemId());
+    }
+
+    @Test
+    void excludesMembersItemsWhenDisallowed() {
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).membersItemsAllowed(false).build();
+        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        // 200 is members; 400 has no mapping entry, so membership is unknown -> excluded too.
+        assertEquals(1, result.size());
+        assertEquals(100, result.get(0).itemId());
+    }
+
+    @Test
+    void includesMembersItemsByDefault() {
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        assertTrue(result.stream().anyMatch(c -> c.itemId() == 200));
     }
 
     @Test
