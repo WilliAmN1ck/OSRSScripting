@@ -36,7 +36,7 @@
   - [x] 3c.2 OfferTracker (core, TDD) — 9 tests green; fixes never-called recordPurchase
   - [x] 3c.3 PersistedState v2 (stockEntries + offerStamps; v1-compat) + StateMapper
   - [x] 3c.4 FlipTask integration (stamped offers, stock filter, Supplier<FlipConfig>, per-tick persist) — 8 tests green
-  - [ ] 3c.5 Break guard (BreakSource port, BreakIdleTask)
+  - [x] 3c.5 Break guard (BreakSource port, BreakIdleTask, SdkBreakSource) — 2 tests green
   - [ ] 3c.6 FlipperPanel (Swing) + GeFlipperScript composition root
   - [ ] 3c.7 Full verification, /code-review max, handoff, PR
 - [ ] 3d Validation-first: load/run trivial script in Echo
