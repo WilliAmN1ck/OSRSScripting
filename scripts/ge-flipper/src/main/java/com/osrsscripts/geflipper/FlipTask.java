@@ -19,6 +19,7 @@ import com.osrsscripts.core.persistence.StateMapper;
 import com.osrsscripts.core.prices.WikiPriceClient;
 import com.osrsscripts.core.task.Task;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,8 +33,12 @@ import java.util.function.Supplier;
  * {@link OfferTracker}), read the market, rank candidates, decide the Grand Exchange actions, and
  * execute them. Only stock the flipper itself bought is offered for sale. Config is re-read every
  * tick so sidebar edits apply immediately; any tick that acted snapshots the persistable state.
- * Runs only while the GE is open. A transient market-fetch failure skips the tick rather than
- * killing the script.
+ *
+ * <p>The GE interface is touched only with cause: offers and inventory are client state and read
+ * fine with it closed, so an idle tick leaves the interface alone, a tick with pending actions
+ * opens it (acting the tick after), and a failed placement backs off for {@code retryBackoff}
+ * rather than flapping the interface on every tick. A transient market-fetch failure skips the
+ * tick rather than killing the script.
  */
 public final class FlipTask implements Task {
 
@@ -48,11 +53,13 @@ public final class FlipTask implements Task {
     private final Supplier<FlipConfig> config;
     private final FlipActionExecutor executor;
     private final Consumer<PersistedState> persister;
+    private final Duration retryBackoff;
+    private Instant retryAfter = Instant.MIN;
 
     public FlipTask(GeClient client, WikiPriceClient prices, FlipScanner scanner, FlipEngine engine,
                     GeTax tax, BuyLimitLedger ledger, StockLedger stock, OfferTracker tracker,
                     Supplier<FlipConfig> config, FlipActionExecutor executor,
-                    Consumer<PersistedState> persister) {
+                    Consumer<PersistedState> persister, Duration retryBackoff) {
         this.client = Objects.requireNonNull(client, "client");
         this.prices = Objects.requireNonNull(prices, "prices");
         this.scanner = Objects.requireNonNull(scanner, "scanner");
@@ -64,11 +71,12 @@ public final class FlipTask implements Task {
         this.config = Objects.requireNonNull(config, "config");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.persister = Objects.requireNonNull(persister, "persister");
+        this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff");
     }
 
     @Override
     public boolean shouldRun() {
-        return client.isOpen();
+        return true;
     }
 
     @Override
@@ -88,16 +96,25 @@ public final class FlipTask implements Task {
         Instant now = Instant.now();
         FlipConfig currentConfig = config.get();
         List<GeOffer> offers = tracker.observe(client.offers(), now);
+        if (now.isBefore(retryAfter)) {
+            return; // backing off after a failed placement; keep observing, stop acting
+        }
         AccountState account = new AccountState(client.coins(), offers, sellableStock());
         List<FlipCandidate> candidates = scanner.scan(mapping, latest, volumes, currentConfig, tax);
         List<FlipAction> actions =
                 engine.decide(candidates, latest, account, ledger, currentConfig, now);
-        executor.execute(actions);
-
-        if (!actions.isEmpty()) {
-            ledger.prune(now);
-            persister.accept(StateMapper.snapshot(ledger, stock, tracker, currentConfig));
+        if (actions.isEmpty()) {
+            return; // nothing to do: leave the GE interface alone
         }
+        if (!client.isOpen()) {
+            client.open();
+            return; // act next tick, once the interface is up
+        }
+        if (!executor.execute(actions)) {
+            retryAfter = now.plus(retryBackoff);
+        }
+        ledger.prune(now);
+        persister.accept(StateMapper.snapshot(ledger, stock, tracker, currentConfig));
     }
 
     /**

@@ -23,21 +23,27 @@ public final class FlipActionExecutor {
         this.client = Objects.requireNonNull(client, "client");
     }
 
-    /** Executes each action, collapsing any number of {@code COLLECT}s into one {@code collect()}. */
-    public void execute(List<FlipAction> actions) {
+    /**
+     * Executes each action, collapsing any number of {@code COLLECT}s into one {@code collect()}.
+     * Returns whether every placement succeeded, so the caller can back off on failure.
+     */
+    public boolean execute(List<FlipAction> actions) {
         boolean collected = false;
+        boolean placementsOk = true;
         for (FlipAction action : actions) {
             switch (action.type()) {
                 case PLACE_BUY:
                     if (!client.placeBuy(action.itemId(), (int) action.pricePerItem(),
                             action.quantity())) {
                         client.close();
+                        placementsOk = false;
                     }
                     break;
                 case PLACE_SELL:
                     if (!client.placeSell(action.itemId(), (int) action.pricePerItem(),
                             action.quantity())) {
                         client.close();
+                        placementsOk = false;
                     }
                     break;
                 case CANCEL:
@@ -53,5 +59,6 @@ public final class FlipActionExecutor {
                     throw new IllegalStateException("Unhandled action type: " + action.type());
             }
         }
+        return placementsOk;
     }
 }

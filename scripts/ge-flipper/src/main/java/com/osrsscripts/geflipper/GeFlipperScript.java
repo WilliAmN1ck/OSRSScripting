@@ -29,8 +29,9 @@ import org.tribot.script.sdk.util.ScriptSettings;
 
 /**
  * Entry point for the Grand Exchange flipper. Each loop drives a {@link TaskRunner} that idles
- * during client-scheduled breaks, opens the GE if needed, then runs one flip tick: observe
- * offers, read the market, decide actions, and execute them against the game client.
+ * during client-scheduled breaks, then runs one flip tick: observe offers, read the market,
+ * decide actions, and execute them against the game client (opening the GE only when a tick
+ * actually has actions to perform).
  *
  * <p>The flipping logic lives in {@code libraries:core}; this class is the composition root that
  * wires it to the TRiBot SDK: {@link SdkGeClient} for the GE, a {@link FlipperPanel} sidebar tab
@@ -43,6 +44,7 @@ public final class GeFlipperScript implements TribotScript {
     private static final String TAB_NAME = "GE Flipper";
     private static final String STATE_FILE = "ge-flipper-state.json";
     private static final long TICK_INTERVAL_MS = 2_000L;
+    private static final Duration PLACEMENT_RETRY_BACKOFF = Duration.ofSeconds(10);
 
     @Override
     public void execute(ScriptContext context) {
@@ -77,9 +79,8 @@ public final class GeFlipperScript implements TribotScript {
 
         List<Task> tasks = List.of(
                 new BreakIdleTask(new SdkBreakSource(context.getSidecars())),
-                new EnsureGeOpenTask(client),
                 new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                        config::get, executor, persister));
+                        config::get, executor, persister, PLACEMENT_RETRY_BACKOFF));
         TaskRunner runner = new TaskRunner(tasks);
 
         Instant startedAt = Instant.now();

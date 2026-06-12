@@ -43,10 +43,14 @@ class FlipTaskTest {
     private final List<PersistedState> persisted = new ArrayList<>();
 
     private FlipTask task(HttpFetcher fetcher) {
+        return task(fetcher, Duration.ZERO);
+    }
+
+    private FlipTask task(HttpFetcher fetcher, Duration retryBackoff) {
         WikiPriceClient prices = new WikiPriceClient(
                 fetcher, Clock.systemUTC(), BASE_URL, Duration.ofMinutes(5), Duration.ofHours(6));
         return new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                config::get, new FlipActionExecutor(client), persisted::add);
+                config::get, new FlipActionExecutor(client), persisted::add, retryBackoff);
     }
 
     private static FlipConfig buyingConfig() {
@@ -62,13 +66,48 @@ class FlipTaskTest {
     }
 
     @Test
-    void shouldRunFollowsClientOpenState() {
+    void opensTheGeOnlyWhenActionsArePending() {
+        client.open = false;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
         FlipTask task = task(new CannedFetcher());
+        task.execute();
+
+        assertEquals(1, client.openCalls, "pending buy: open the GE first");
+        assertTrue(client.buys.isEmpty(), "placement waits until the GE is open");
 
         client.open = true;
-        assertTrue(task.shouldRun());
+        task.execute();
+        assertEquals(1, client.buys.size(), "next tick places through the open GE");
+    }
+
+    @Test
+    void idleTickNeverTouchesTheGe() {
         client.open = false;
-        assertFalse(task.shouldRun());
+        client.coins = 0L; // nothing affordable, nothing owned: no actions
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        task(new CannedFetcher()).execute();
+
+        assertEquals(0, client.openCalls, "no work, no interface churn");
+    }
+
+    @Test
+    void failedPlacementBacksOffInsteadOfFlapping() {
+        client.open = true;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        client.placementsSucceed = false;
+
+        FlipTask task = task(new CannedFetcher(), Duration.ofHours(1));
+        task.execute();
+        assertEquals(1, client.buys.size());
+        assertEquals(1, client.closeCalls, "failed placement resets the interface");
+
+        task.execute();
+        assertEquals(1, client.buys.size(), "backoff: no immediate retry");
+        assertEquals(1, client.closeCalls);
     }
 
     @Test
