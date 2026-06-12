@@ -22,6 +22,13 @@
 - [x] Re-baselined JDK 11 → 21 (build.gradle.kts, CI, README); verified 35 tests green on 21
 - [x] Updated spec.md (decisions + Open Items) and plan.md (Phase 3 unblocked, real `TribotScript` API, fatJar/deployLocally)
 
+## Phase 3 research — branch `phase-3-research` (2026-06-11)
+- [x] Mapped the TribotRS repos + SDK docs; captured in docs/reference/tribot-sdk.md
+- [x] GE API found in the Script SDK (org.tribot.script.sdk.GrandExchange) — executor is thin
+- [x] GUI = ScriptContext.sidebar; breaks/login = ScriptContext.sidecars; flagged gson-vs-Jackson
+- [x] Marked spec §5 Open Items resolved
+
 ## Phase 3 — SDK integration & GE flipper  (dev UNBLOCKED; live run needs local TRiBot Echo)
-- TribotScript/ScriptContext entry point; FlipActionExecutor over the SDK GE API; config UI; deploy via fatJar/deployLocally
+- TribotScript/ScriptContext entry point; FlipActionExecutor over GrandExchange; sidebar config UI; deploy via fatJar/deployLocally
+- Reference: docs/reference/tribot-sdk.md
 ## Phase 4 — Publish / distribution  (later / optional)
