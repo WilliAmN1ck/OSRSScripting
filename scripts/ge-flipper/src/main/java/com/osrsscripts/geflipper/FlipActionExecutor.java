@@ -10,6 +10,10 @@ import java.util.Objects;
  *
  * <p>The engine emits one {@code COLLECT} per collectable slot, but the SDK's {@code collectAll}
  * drains every finished offer at once, so collects are deduplicated to a single call per batch.
+ *
+ * <p>A failed placement can leave the in-game offer-setup screen open (observed live with an item
+ * the GE could not resolve), wedging every later placement; closing the GE resets the interface
+ * and the open-GE task reopens it fresh next tick.
  */
 public final class FlipActionExecutor {
 
@@ -25,10 +29,16 @@ public final class FlipActionExecutor {
         for (FlipAction action : actions) {
             switch (action.type()) {
                 case PLACE_BUY:
-                    client.placeBuy(action.itemId(), (int) action.pricePerItem(), action.quantity());
+                    if (!client.placeBuy(action.itemId(), (int) action.pricePerItem(),
+                            action.quantity())) {
+                        client.close();
+                    }
                     break;
                 case PLACE_SELL:
-                    client.placeSell(action.itemId(), (int) action.pricePerItem(), action.quantity());
+                    if (!client.placeSell(action.itemId(), (int) action.pricePerItem(),
+                            action.quantity())) {
+                        client.close();
+                    }
                     break;
                 case CANCEL:
                     client.abort(action.slot());

@@ -21,11 +21,24 @@ class StateStoreTest {
                 Arrays.asList(new StockEntry(4151, 3, 100_000L)),
                 Arrays.asList(new OfferStampEntry(1, 4151, "SELL", 150_000L, 2,
                         1_700_000_600_000L)),
+                new PersistedConfig(116_000L, 25_000L, 2L, 0.01, 5_000L, 3, 30L, false),
                 123_456L, 7L);
 
         store.save(original);
 
         assertEquals(original, store.load());
+    }
+
+    @Test
+    void v2FileWithoutConfigLoadsNullConfig(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("state.json");
+        Files.write(file, ("{\"ledgerEntries\":[],\"stockEntries\":[],\"offerStamps\":[],"
+                + "\"realizedProfit\":42,\"flipsCompleted\":3}").getBytes());
+
+        PersistedState loaded = new StateStore(file).load();
+
+        assertEquals(42L, loaded.realizedProfit());
+        assertEquals(null, loaded.config());
     }
 
     @Test

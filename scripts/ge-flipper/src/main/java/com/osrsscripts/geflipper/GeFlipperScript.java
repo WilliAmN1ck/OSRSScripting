@@ -69,7 +69,9 @@ public final class GeFlipperScript implements TribotScript {
             }
         };
 
-        AtomicReference<FlipConfig> config = new AtomicReference<>(defaultConfig());
+        FlipConfig restoredConfig = StateMapper.restoredConfig(loaded);
+        AtomicReference<FlipConfig> config =
+                new AtomicReference<>(restoredConfig != null ? restoredConfig : defaultConfig());
         FlipperPanel panel = new FlipperPanel(config.get(), config::set);
         context.getSidebar().addSidebarTab(TAB_NAME, null, panel);
 
@@ -89,7 +91,7 @@ public final class GeFlipperScript implements TribotScript {
             }
         } finally {
             // Save first: a failure tearing down the sidebar must not cost us the final state.
-            persister.accept(StateMapper.snapshot(ledger, stock, tracker));
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, config.get()));
             context.getSidebar().removeSidebarTab(TAB_NAME);
         }
     }
@@ -119,15 +121,19 @@ public final class GeFlipperScript implements TribotScript {
         }
     }
 
-    /** Initial run parameters; the sidebar panel replaces them live once edited. */
+    /**
+     * First-run parameters, used only when no persisted config exists. {@code capitalCap = 0}
+     * disables buying, so a fresh install idles until the user sets a capital cap in the sidebar
+     * — it must never start trading (or hunting members items on an F2P world) on guesses.
+     */
     private static FlipConfig defaultConfig() {
         return FlipConfig.builder()
-                .capitalCap(1_000_000L)
+                .capitalCap(0L)
                 .perItemCapitalCap(250_000L)
                 .minMarginGp(5L)
                 .minMarginPct(0.01)
                 .minVolume(1_000L)
-                .maxSlots(4)
+                .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
                 .build();
     }

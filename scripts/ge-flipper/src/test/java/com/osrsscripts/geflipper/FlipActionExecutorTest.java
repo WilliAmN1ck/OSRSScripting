@@ -48,6 +48,21 @@ class FlipActionExecutorTest {
     }
 
     @Test
+    void failedPlacementClosesTheGeToResetItsInterface() {
+        client.placementsSucceed = false;
+
+        executor.execute(List.of(FlipAction.placeBuy(0, 1234, 100L, 7)));
+        assertEquals(1, client.closeCalls, "failed buy resets the GE interface");
+
+        executor.execute(List.of(FlipAction.placeSell(0, 55, 200L, 3)));
+        assertEquals(2, client.closeCalls, "failed sell resets the GE interface");
+
+        client.placementsSucceed = true;
+        executor.execute(List.of(FlipAction.placeBuy(0, 1234, 100L, 7)));
+        assertEquals(2, client.closeCalls, "successful placement does not close");
+    }
+
+    @Test
     void mixedBatchDispatchesEachActionKind() {
         executor.execute(List.of(
                 FlipAction.collect(1),

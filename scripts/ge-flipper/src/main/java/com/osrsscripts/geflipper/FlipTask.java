@@ -96,7 +96,7 @@ public final class FlipTask implements Task {
 
         if (!actions.isEmpty()) {
             ledger.prune(now);
-            persister.accept(StateMapper.snapshot(ledger, stock, tracker));
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, currentConfig));
         }
     }
 

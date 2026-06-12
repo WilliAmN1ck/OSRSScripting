@@ -18,6 +18,9 @@ public interface GeClient {
     /** Opens the Grand Exchange interface, returning whether it is open afterwards. */
     boolean open();
 
+    /** Closes the Grand Exchange interface, resetting any half-finished offer-setup state. */
+    boolean close();
+
     /** The eight Grand Exchange slots as offers, slot-indexed, with empty slots as {@link GeOffer#empty}. */
     List<GeOffer> offers();
 
