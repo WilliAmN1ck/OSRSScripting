@@ -132,15 +132,28 @@ the community automations repo:
 - **JDK — RESOLVED:** JDK 21.
 - **Subscription — RESOLVED:** not required to develop or build.
 
-Remaining (confirm while coding Phase 3 — none block development):
+Resolved during SDK research — full detail in
+[`../../reference/tribot-sdk.md`](../../reference/tribot-sdk.md):
 
-1. **Grand Exchange API surface** — the exact SDK class/methods to place, collect
-   and cancel GE offers and read offer/slot state (the miner example shows
-   `Inventory`, `Banking`, `Interaction`, `WorldViews`… but not GE). Confirm from
-   the plugin's bundled SDK / javadoc.
-2. **Config UI** — whether a RuneLite side panel is exposed, else Compose/JavaFX/Swing.
-3. **Running Echo** — whether a (free) account/login is needed to *run* a script.
-   Affects live testing only, not building.
+- **Grand Exchange API — RESOLVED:** `org.tribot.script.sdk.GrandExchange` (Script SDK,
+  wired `compileOnly` by default) — `placeOffer(CreateOfferConfig)`, `abort(slot)`,
+  `collectAll(method)`; read via `GrandExchangeOfferQuery`/`GrandExchangeOffer`
+  (`Status = EMPTY/IN_PROGRESS/COMPLETED/CANCELLED`, `Type = BUY/SELL`, 8 `Slot`s). Maps
+  almost 1:1 onto our model, so the `FlipActionExecutor` is thin API calls — not the
+  manual UI automation first feared. (The Automation SDK itself has no GE API.)
+- **Config UI — RESOLVED:** `ScriptContext.sidebar` (+ `useCompose`/`useJavaFx`).
+- **Breaks/login — RESOLVED:** `ScriptContext.sidecars` (`BreakHandler`, `LoginHandler`)
+  — our `humanize.BreakScheduler` becomes optional.
+
+Remaining tiny unknowns (resolve in IntelliJ with the plugin applied; none block work):
+
+1. Exact `CreateOfferConfig` builder shape and the coins-reading call.
+2. Which `permissions` entry GE/trading requires.
+3. Whether running a script in Echo needs a (free) account/login.
+
+**Runtime dependency note:** Echo provides **gson**, not Jackson. `libraries/core` uses
+`jackson-databind` (`WikiPriceClient`, `StateStore`) — at runtime in Echo we must either
+`bundled(...)` Jackson or migrate those two classes to gson (provided). See the reference.
 
 ---
 

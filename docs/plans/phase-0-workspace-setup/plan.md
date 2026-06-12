@@ -229,7 +229,10 @@ subscription.
 
 > Confirmed from the official IntelliJ setup guide + the community automations
 > repo. Building needs only JDK 21 + the JitPack plugin; only a live *run* needs a
-> local TRiBot Echo install. Exact GE API names confirmed while coding (spec §5.1).
+> local TRiBot Echo install.
+>
+> **SDK reference** (API surface, model→SDK mapping, build wiring, gotchas):
+> [`../../reference/tribot-sdk.md`](../../reference/tribot-sdk.md).
 
 1. **`scripts/ge-flipper` module** applying `kotlin("jvm")` (or plain `java`) +
    `id("org.tribot.dev") version "latest.release"`. Repos: `mavenCentral`,
@@ -239,9 +242,10 @@ subscription.
 2. **Entry point** — `GeFlipperScript implements org.tribot.automation.TribotScript`
    with `void execute(ScriptContext context)`, registered in the module's
    `tribot { }` block (`script(...)`). Its loop drives a `TaskRunner`.
-3. **`FlipActionExecutor`** — the single SDK-coupled class: turns each `FlipAction`
-   (`PLACE_BUY`/`PLACE_SELL`/`COLLECT`/`CANCEL`) into real GE interactions via the
-   SDK's Grand Exchange API, with humanized timing from `core.humanize`.
+3. **`FlipActionExecutor`** — the single SDK-coupled class: maps each `FlipAction`
+   to a thin `org.tribot.script.sdk.GrandExchange` call (`placeOffer` / `abort` /
+   `collectAll`); reads offers via `GrandExchangeOfferQuery`. See the model→SDK
+   mapping in the reference.
 4. **Account adapter** — read cash, the 8 GE slots (→ `GeOffer`s) and owned stock
    each tick to build the `AccountState` the engine consumes.
 5. **Config UI** — bind `FlipConfig` + live stats; RuneLite side panel if exposed,
