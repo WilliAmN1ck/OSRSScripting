@@ -1,0 +1,147 @@
+package com.osrsscripts.core.ge;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.osrsscripts.core.model.AccountState;
+import com.osrsscripts.core.model.FlipCandidate;
+import com.osrsscripts.core.model.FlipConfig;
+import com.osrsscripts.core.model.GeOffer;
+import com.osrsscripts.core.model.OfferSide;
+import com.osrsscripts.core.model.OfferStatus;
+import com.osrsscripts.core.model.PricePoint;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class FlipEngineTest {
+
+    private final FlipEngine engine = new FlipEngine();
+    private final Instant now = Instant.parse("2026-06-11T12:00:00Z");
+
+    private List<GeOffer> emptySlots(int n) {
+        List<GeOffer> offers = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            offers.add(GeOffer.empty(i));
+        }
+        return offers;
+    }
+
+    private FlipConfig config() {
+        return FlipConfig.builder()
+                .capitalCap(10_000_000L)
+                .perItemCapitalCap(Long.MAX_VALUE)
+                .maxSlots(8)
+                .maxOfferAge(Duration.ofMinutes(30))
+                .minMarginGp(1)
+                .build();
+    }
+
+    private FlipCandidate candidate(int itemId, long buy, long sell, int buyLimit) {
+        long margin = sell - buy;
+        return new FlipCandidate(itemId, buy, sell, margin, 10_000, buyLimit, (double) margin / buy);
+    }
+
+    @Test
+    void collectsCompletedOffers() {
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.COMPLETE, OfferSide.BUY, 100, 1000, 50, 50, now));
+        AccountState account = new AccountState(1_000_000L, offers, Collections.emptyMap());
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), Collections.emptyMap(),
+                account, new BuyLimitLedger(), config(), now);
+
+        assertEquals(Collections.singletonList(FlipAction.collect(0)), actions);
+    }
+
+    @Test
+    void sellsOwnedStock() {
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(100, new PricePoint(1100, now, 1000, now));
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(100, 50);
+        AccountState account = new AccountState(0L, emptySlots(8), stock);
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config(), now);
+
+        assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1100, 50)), actions);
+    }
+
+    @Test
+    void buysTopCandidateRespectingPerItemCap() {
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(100_000L).maxSlots(8).minMarginGp(1)
+                .build();
+        AccountState account = new AccountState(10_000_000L, emptySlots(8), Collections.emptyMap());
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 1000));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
+                new BuyLimitLedger(), config, now);
+
+        assertEquals(Collections.singletonList(FlipAction.placeBuy(0, 100, 1000, 100)), actions);
+    }
+
+    @Test
+    void doesNotBuyWhenAllSlotsActive() {
+        List<GeOffer> offers = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            offers.add(new GeOffer(i, OfferStatus.ACTIVE, OfferSide.BUY, 100 + i, 1000, 10, 0, now));
+        }
+        AccountState account = new AccountState(10_000_000L, offers, Collections.emptyMap());
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(999, 1000, 1100, 1000));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
+                new BuyLimitLedger(), config(), now);
+
+        assertTrue(actions.isEmpty());
+    }
+
+    @Test
+    void skipsItemWithExhaustedBuyLimit() {
+        AccountState account = new AccountState(10_000_000L, emptySlots(8), Collections.emptyMap());
+        BuyLimitLedger ledger = new BuyLimitLedger();
+        ledger.recordPurchase(100, 100, now);
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 100));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account, ledger,
+                config(), now);
+
+        assertTrue(actions.isEmpty());
+    }
+
+    @Test
+    void cancelsStaleOffer() {
+        List<GeOffer> offers = emptySlots(8);
+        Instant old = now.minus(Duration.ofMinutes(31));
+        offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 100, 1000, 0, 0, old));
+        AccountState account = new AccountState(10_000_000L, offers, Collections.emptyMap());
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), Collections.emptyMap(),
+                account, new BuyLimitLedger(), config(), now);
+
+        assertEquals(Collections.singletonList(FlipAction.cancel(0)), actions);
+    }
+
+    @Test
+    void totalCapitalCapLimitsNewBuyQuantity() {
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 200, 1000, 500, 0, now));
+        AccountState account = new AccountState(1_000_000L, offers, Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(600_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 1000));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
+                new BuyLimitLedger(), config, now);
+
+        assertEquals(Collections.singletonList(FlipAction.placeBuy(1, 100, 1000, 100)), actions);
+    }
+}
