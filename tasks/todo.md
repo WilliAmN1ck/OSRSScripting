@@ -29,6 +29,9 @@
 - [x] Marked spec §5 Open Items resolved
 
 ## Phase 3 — SDK integration & GE flipper  (dev UNBLOCKED; live run needs local TRiBot Echo)
-- TribotScript/ScriptContext entry point; FlipActionExecutor over GrandExchange; sidebar config UI; deploy via fatJar/deployLocally
-- Reference: docs/reference/tribot-sdk.md
+- [x] 3a Module skeleton: ge-flipper wired to org.tribot.dev + trivial TribotScript; build + fatJar verified (daemon on JDK 21)
+- [ ] 3b FlipActionExecutor over GrandExchange + offer/cash adapter → AccountState; wire FlipEngine in execute() loop
+- [ ] 3c Sidebar config UI; persistence (StateStore); breaks via sidecars
+- [ ] 3d Validation-first: load/run trivial script in Echo
+- Reference: docs/reference/tribot-sdk.md ; handoff: docs/plans/phase-3-ge-flipper/handoff.md
 ## Phase 4 — Publish / distribution  (later / optional)

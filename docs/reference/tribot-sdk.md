@@ -74,6 +74,9 @@ dependencies {
 - Automations dir (Windows): `%APPDATA%/.tribot/automations`.
 - **JDK 21**, Kotlin **2.1.21**. `latest.release` keeps the compile-time API in lockstep
   with Echo's runtime.
+- **The Gradle daemon must run on JDK 21+** — the plugin rejects older JVMs ("Dependency
+  requires at least JVM runtime version 21"). Set `JAVA_HOME` to a JDK 21 to run Gradle
+  (a too-new JVM may also exceed the Gradle version's supported range).
 
 ---
 
