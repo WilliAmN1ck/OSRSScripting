@@ -2,6 +2,7 @@ package com.osrsscripts.geflipper;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.osrsscripts.core.ge.FlipAction;
@@ -60,6 +61,21 @@ class FlipActionExecutorTest {
         client.placementsSucceed = true;
         executor.execute(List.of(FlipAction.placeBuy(0, 1234, 100L, 7)));
         assertEquals(2, client.closeCalls, "successful placement does not close");
+    }
+
+    @Test
+    void failedAbortOrCollectReportsFailureWithoutClosingTheGe() {
+        client.abortsSucceed = false;
+        assertFalse(executor.execute(List.of(FlipAction.cancel(2))));
+        assertEquals(0, client.closeCalls, "abort failure does not wedge the setup screen");
+
+        client.abortsSucceed = true;
+        client.collectsSucceed = false;
+        assertFalse(executor.execute(List.of(FlipAction.collect(1))));
+        assertEquals(0, client.closeCalls);
+
+        client.collectsSucceed = true;
+        assertTrue(executor.execute(List.of(FlipAction.cancel(2), FlipAction.collect(1))));
     }
 
     @Test

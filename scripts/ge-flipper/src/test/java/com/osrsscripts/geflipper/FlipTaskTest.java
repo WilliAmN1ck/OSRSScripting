@@ -94,6 +94,21 @@ class FlipTaskTest {
     }
 
     @Test
+    void failedGeOpenBacksOffInsteadOfRetryingEveryTick() {
+        client.open = false;
+        client.opensSucceed = false;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        FlipTask task = task(new CannedFetcher(), Duration.ofHours(1));
+        task.execute();
+        assertEquals(1, client.openCalls);
+
+        task.execute();
+        assertEquals(1, client.openCalls, "backoff: no immediate open retry");
+    }
+
+    @Test
     void failedPlacementBacksOffInsteadOfFlapping() {
         client.open = true;
         client.coins = 1_000L;

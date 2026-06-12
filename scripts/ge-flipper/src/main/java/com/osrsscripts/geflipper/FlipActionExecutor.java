@@ -25,33 +25,39 @@ public final class FlipActionExecutor {
 
     /**
      * Executes each action, collapsing any number of {@code COLLECT}s into one {@code collect()}.
-     * Returns whether every placement succeeded, so the caller can back off on failure.
+     * Returns whether every action succeeded, so the caller can back off on failure instead of
+     * retrying every tick. Only failed placements close the GE — they are the failures that can
+     * leave the offer-setup screen wedged.
      */
     public boolean execute(List<FlipAction> actions) {
         boolean collected = false;
-        boolean placementsOk = true;
+        boolean actionsOk = true;
         for (FlipAction action : actions) {
             switch (action.type()) {
                 case PLACE_BUY:
                     if (!client.placeBuy(action.itemId(), (int) action.pricePerItem(),
                             action.quantity())) {
                         client.close();
-                        placementsOk = false;
+                        actionsOk = false;
                     }
                     break;
                 case PLACE_SELL:
                     if (!client.placeSell(action.itemId(), (int) action.pricePerItem(),
                             action.quantity())) {
                         client.close();
-                        placementsOk = false;
+                        actionsOk = false;
                     }
                     break;
                 case CANCEL:
-                    client.abort(action.slot());
+                    if (!client.abort(action.slot())) {
+                        actionsOk = false;
+                    }
                     break;
                 case COLLECT:
                     if (!collected) {
-                        client.collect();
+                        if (!client.collect()) {
+                            actionsOk = false;
+                        }
                         collected = true;
                     }
                     break;
@@ -59,6 +65,6 @@ public final class FlipActionExecutor {
                     throw new IllegalStateException("Unhandled action type: " + action.type());
             }
         }
-        return placementsOk;
+        return actionsOk;
     }
 }

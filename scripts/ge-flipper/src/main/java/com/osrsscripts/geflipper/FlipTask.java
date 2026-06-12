@@ -107,7 +107,9 @@ public final class FlipTask implements Task {
             return; // nothing to do: leave the GE interface alone
         }
         if (!client.isOpen()) {
-            client.open();
+            if (!client.open()) {
+                retryAfter = now.plus(retryBackoff); // e.g. not at the GE booth: don't spam open
+            }
             return; // act next tick, once the interface is up
         }
         if (!executor.execute(actions)) {
