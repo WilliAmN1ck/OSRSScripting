@@ -31,7 +31,14 @@
 ## Phase 3 — SDK integration & GE flipper  (dev UNBLOCKED; live run needs local TRiBot Echo)
 - [x] 3a Module skeleton: ge-flipper wired to org.tribot.dev + trivial TribotScript; build + fatJar verified (daemon on JDK 21)
 - [x] 3b GeClient port + SdkGeClient adapter + FlipActionExecutor; FlipEngine wired via TaskRunner (EnsureGeOpenTask + FlipTask) in execute(); 13 tests green, build + fatJar verified
-- [ ] 3c Sidebar config UI; persistence (StateStore); breaks via sidecars
+- [ ] 3c Config UI + persistence + breaks — branch `phase-3c-config-persistence`; spec + plan approved (docs/plans/phase-3-ge-flipper/{spec,plan}-3c-config-persistence.md)
+  - [ ] 3c.1 StockLedger (core, TDD)
+  - [ ] 3c.2 OfferTracker (core, TDD) — stamps placedAt, fixes never-called recordPurchase, profit accounting
+  - [ ] 3c.3 PersistedState v2 (stockEntries + offerStamps; v1-compat)
+  - [ ] 3c.4 FlipTask integration (stamped offers, stock filter, Supplier<FlipConfig>, per-tick persist)
+  - [ ] 3c.5 Break guard (BreakSource port, BreakIdleTask)
+  - [ ] 3c.6 FlipperPanel (Swing) + GeFlipperScript composition root
+  - [ ] 3c.7 Full verification, /code-review max, handoff, PR
 - [ ] 3d Validation-first: load/run trivial script in Echo
 - Reference: docs/reference/tribot-sdk.md ; handoff: docs/plans/phase-3-ge-flipper/handoff.md
 ## Phase 4 — Publish / distribution  (later / optional)
