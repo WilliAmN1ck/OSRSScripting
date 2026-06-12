@@ -180,3 +180,40 @@ Adaptations (no change needed in the pure engine):
 4. Config via `context.sidebar`; breaks via `context.sidecars`; persist the buy-limit ledger via `StateStore`.
 
 Run/test needs a local **TRiBot Echo** install (free; confirm whether a login is required).
+
+---
+
+## Live testing via the TRiBot CLI (for 3d)
+
+From <https://tribot.org/learn/guides/tribot-cli> (researched 2026-06-12): a standalone
+command-line launcher (`tribot.exe` on Windows; download from the TRiBot Downloads page,
+extract anywhere). **Prerequisite:** log into the TRiBot Launcher at least once first — the
+CLI reuses its saved credentials.
+
+The repeatable verification loop:
+
+    .\gradlew.bat :scripts:ge-flipper:deployLocally     # fat JAR -> %APPDATA%/.tribot/automations
+    .\tribot.exe run --script-name "GE Flipper" `
+        --jagex-character-name "<character>" --world <world> `
+        --break-profile-name "<profile>" --heap-mb 1024
+
+Useful `run` flags:
+
+| Flag | Use for 3d |
+|---|---|
+| `--script-name` | Loads the script by its registered `scriptName` ("GE Flipper"). |
+| `--break-profile-name` | Deterministic `BreakIdleTask` testing: a profile with a near-immediate short break exercises the pause while offers keep filling. |
+| `--jagex-character-name` / `--jagex-character-id` | Saved-account selection; `--legacy-username` + `--legacy-password-raw` bypass the account manager. |
+| `--world` | Pin a quiet world for consistent runs. |
+| `--heap-mb`, `--fps-limit` (1–50), `--minimized` | Lean unattended soak runs. |
+| `--script-args` | Unused (our config is the sidebar panel); future option for launch presets. |
+
+Also available: `bulk-launch` (CSV-driven multi-client — not needed, single account),
+`accounts`/`proxies` (CSV import/export), `--no-update`, `--version`.
+
+**To confirm in 3d:**
+- Whether `--script-name` resolves **local automations** from `%APPDATA%/.tribot/automations`
+  (our `deployLocally` output) or only repository scripts. If local resolves, the whole
+  verification loop is scriptable end to end.
+- The CLI does not answer the open stop-signal question (how a script stop maps to thread
+  interruption — the shutdown save depends on it); exercise stopping manually in-client.
