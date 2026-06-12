@@ -3,20 +3,21 @@
 
 **Date:** 2026-06-11
 **Spec reference:** [`spec.md`](./spec.md)
-**Status:** Plan — pending confirmation (no execution until approved)
+**Status:** Phases 1–2 executed. Revised on `phase-3-prep` with confirmed SDK/JDK facts; Phase 3 is now unblocked for development.
 
 ---
 
 ## 0. Strategy: two tracks
 
-The user has **no TRiBot subscription / SDK yet**, and the paid SDK signatures
-are unknown. To make progress without coding against guesses, work is split:
+Work is split into two tracks. (Originally Track B was assumed blocked on a paid
+subscription — that was **wrong**; the SDK is free via the `org.tribot.dev` Gradle
+plugin, so Track B is buildable now. Only a live *run* needs TRiBot Echo installed.)
 
-- **Track A — buildable & testable now.** SDK-independent pure logic + project
-  scaffold. Plain `mavenCentral`, JUnit. No TRiBot dependency.
-- **Track B — blocked until subscription + SDK in hand.** The TRiBot Gradle
-  plugin, the Automation SDK entry point, RuneLite GUI, and the adapters that
-  actually click the GE. Outlined here; **not** executed until unblocked.
+- **Track A — done (Phases 1–2).** SDK-independent pure logic + scaffold. Plain
+  `mavenCentral`, JUnit. No TRiBot dependency.
+- **Track B — Phase 3, now unblocked.** The `org.tribot.dev` plugin, the
+  `TribotScript`/`ScriptContext` entry point, the config UI, and the adapter that
+  actually clicks the GE. Only live testing needs a local Echo install.
 
 ### The architectural seam that makes this clean
 
@@ -43,9 +44,10 @@ Everything above `FlipActionExecutor` is testable today.
 
 - **Root project:** `osrs-scripts-suite`
 - **Base package:** `com.osrsscripts`
-- **JDK toolchain:** **Java 11** (conservative floor — TRiBot template states 11;
-  code compiling on 11 runs on 17. Avoid records/sealed for now. Bump + adopt
-  them only once the SDK confirms 17+ — see spec §5).
+- **JDK toolchain:** **Java 21** (hard requirement — Echo loads only JDK 21 class
+  files; confirmed by the official setup guide). Re-baselined from 11 on
+  `phase-3-prep`. `libraries/core` was written to plain Java 11 APIs and compiles
+  cleanly on 21.
 - **Build:** Gradle Kotlin DSL, multi-module.
 - **HTTP:** `java.net.http.HttpClient` (built into Java 11 — no dependency).
 - **JSON:** Jackson.
@@ -223,60 +225,67 @@ subscription.
 
 ---
 
-## Phase 3 — SDK Integration & GE Flipper Script  *(Track B — BLOCKED)*
+## Phase 3 — SDK Integration & GE Flipper Script  *(Track B — UNBLOCKED for development)*
 
-> **Blocked on:** active TRiBot subscription + the real Automation SDK jar +
-> the official Echo template. Resolves spec §5 unknowns. Outline only — exact
-> file contents written once we can read real SDK signatures.
+> Confirmed from the official IntelliJ setup guide + the community automations
+> repo. Building needs only JDK 21 + the JitPack plugin; only a live *run* needs a
+> local TRiBot Echo install. Exact GE API names confirmed while coding (spec §5.1).
 
-1. **Adopt the official template wiring:** add TRiBot's Gradle plugin + TRiBot
-   Central maven repo; **confirm the JDK** and bump the toolchain if the SDK
-   requires 17+ (then optionally refactor models to records/sealed).
-2. **Create `scripts/ge-flipper` module**; depend on `libraries:core`.
-3. **Automation SDK entry point** — implement the real script class/annotation
-   /lifecycle (replaces the archived drafts' invented `main()`/`tribot-script.json`).
-4. **`FlipActionExecutor`** — the single SDK-coupled class that turns each
-   `FlipAction` into real GE interactions (open GE, search, set price/qty,
-   confirm, collect, cancel), with humanized timing/mouse from `…core.humanize`.
-5. **GE/world adapters** — implement only the ports the flipper needs
-   (GE interface read, login/idle handling); banking/walking adapters deferred
-   to later scripts.
-6. **RuneLite side panel GUI** — bind `FlipConfig` inputs + live stats
-   (profit, open offers, scanner picks). Fall back to Swing if the SDK exposes
-   no panel hook.
-7. **Wire persistence** so the script resumes offers + buy-limit timers on start.
-8. **Validation-first checkpoint:** before full flipper wiring, ship a *trivial*
-   script that loads and runs in Echo (proves the SDK entry point + build/deploy)
-   — per spec sequencing.
+1. **`scripts/ge-flipper` module** applying `kotlin("jvm")` (or plain `java`) +
+   `id("org.tribot.dev") version "latest.release"`. Repos: `mavenCentral`,
+   `maven("https://repo.runelite.net")`, `maven("https://jitpack.io")` plus the
+   JitPack resolutionStrategy for the plugin marker. Bundle the shared library via
+   the plugin's `bundled(project(":libraries:core"))`.
+2. **Entry point** — `GeFlipperScript implements org.tribot.automation.TribotScript`
+   with `void execute(ScriptContext context)`, registered in the module's
+   `tribot { }` block (`script(...)`). Its loop drives a `TaskRunner`.
+3. **`FlipActionExecutor`** — the single SDK-coupled class: turns each `FlipAction`
+   (`PLACE_BUY`/`PLACE_SELL`/`COLLECT`/`CANCEL`) into real GE interactions via the
+   SDK's Grand Exchange API, with humanized timing from `core.humanize`.
+4. **Account adapter** — read cash, the 8 GE slots (→ `GeOffer`s) and owned stock
+   each tick to build the `AccountState` the engine consumes.
+5. **Config UI** — bind `FlipConfig` + live stats; RuneLite side panel if exposed,
+   else Compose/JavaFX/Swing (`tribot { }` toggles `useCompose`/`useJavaFx`).
+6. **Wire persistence** (`StateStore`) so buy-limit timers survive restarts.
+7. **Validation-first checkpoint:** before the full flipper, deploy a *trivial*
+   `TribotScript` and confirm it loads/runs in Echo (proves entry point +
+   `fatJar`/`deployLocally`).
+
+**Build/deploy:** `./gradlew :scripts:ge-flipper:fatJar` then `deployLocally`
+(fat JAR → `%APPDATA%/.tribot/automations`); the plugin auto-generates the manifest.
 
 **Phase 3 acceptance:** trivial script loads in Echo; flipper runs a real cycle;
-`repoPackage` produces a deployable zip.
+`deployLocally` places the JAR in the automations directory.
+
+**Blocked only for live verification on:** a local TRiBot Echo install (and possibly
+a free account/login — spec §5.3).
 
 ---
 
-## Phase 4 — Publish Pipeline  *(Track B — later / optional)*
+## Phase 4 — Publish / Distribution  *(later / optional)*
 
-> Spec: "private now, publish later." Design, don't activate.
+> Spec: "private now, publish later."
 
-- Configure `repoPackage`/`repoUpdate` per the template.
-- If/when publishing: licensing, instance limits, store metadata, support.
+- Private use is just `deployLocally`. Public distribution would mean a PR into
+  the open `Tribot-Community-Automations` repo (MIT) — a different model from a
+  private closed-source script; decide if/when that's wanted.
+- If publishing: licensing, versioning, support obligations.
 
-**Phase 4 acceptance:** `repoPackage` produces a valid repo zip; publish steps
-documented but not run.
+**Phase 4 acceptance:** decision made on private vs. community-repo distribution.
 
 ---
 
 ## Dependency graph
 
 ```
-Phase 1 ─► Phase 2 ─► Phase 3 ─► Phase 4
-(now)      (now)      (blocked:   (later)
-                       subscription
-                       + SDK)
+Phase 1 ─► Phase 2 ─► Phase 3 ──────────► Phase 4
+(done)     (done)     (dev unblocked;      (later)
+                       live run needs
+                       Echo installed)
 ```
 
-Phases 1–2 are fully executable now and deliver the tested flipper brain.
-Phases 3–4 wait on the subscription/SDK.
+Phases 1–2 delivered the tested flipper brain. Phase 3 development can proceed now;
+only the final live run needs a local Echo install.
 
 ---
 
@@ -285,5 +294,6 @@ Phases 3–4 wait on the subscription/SDK.
 - No multi-account/mule support (single account — spec §4).
 - No banking/walking adapters yet (flipper barely uses them; built with later
   scripts).
-- No Shadow fat-JAR / `~/.tribot/automations` deploy (wrong model — archived).
+- No `repoPackage`/repo-zip pipeline — the real deploy is the plugin's `fatJar` +
+  `deployLocally` into `.tribot/automations`.
 - No speculative ports beyond what the flipper needs.

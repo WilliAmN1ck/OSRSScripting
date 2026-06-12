@@ -1,15 +1,15 @@
 # Phase 0 — Workspace Setup
 # Specification Document
 
-**Date:** 2026-06-11
+**Date:** 2026-06-11 (revised on `phase-3-prep`)
 **Branch:** main
-**Status:** Spec — pending confirmation (no implementation until spec + plan approved)
+**Status:** Approved; Phases 1–2 complete. Revised to correct SDK/JDK/subscription facts ahead of Phase 3.
 
 > Supersedes the Copilot-generated drafts now archived in
-> `docs/plans/_archive-copilot-drafts/`. Those drafts assumed the **retired**
-> Legacy-Java-Client model (fat-JAR + `main()` + `~/.tribot/automations` +
-> hand-rolled `tribot-script.json`) and predate both the Echo pivot and the
-> GE-flipper decision. They are kept for history only.
+> `docs/plans/_archive-copilot-drafts/`. Those drafts predate the GE-flipper
+> decision and got the entry point wrong (`main()` + a hand-rolled
+> `tribot-script.json`), but were actually **right** that scripts deploy as
+> fat JARs into the `.tribot/automations` directory. Kept for history.
 
 ---
 
@@ -29,12 +29,20 @@ scripts written in **Java**, targeting **TRiBot's Automation SDK**.
   - **Automation SDK** (Echo-first, 2026, actively developed, non-static,
     lower-level, exposes the full RuneLite API) — **our target**.
   - **Script SDK** (legacy, static, easier, **no longer actively developed**).
-- Developing/running local scripts requires a **paid TRiBot subscription**
-  (Premium or Ultimate). IntelliJ IDEA is the recommended IDE.
+- **Developing/building scripts is free** and needs only **JDK 21** — the SDK is
+  provided by the `org.tribot.dev` Gradle plugin (JitPack); no subscription,
+  account, or token. A local **TRiBot Echo** install is needed only to *run* what
+  you build, and no subscription is documented as required to run either (confirm
+  on install). IntelliJ IDEA is the recommended IDE.
 
-Sources: [Detuks — Java OSRS bot era is over](https://detuks.com/blog/java-osrs-bot-era-is-over-2926-overlook),
-[TRiBot Developer Overview](https://tribot.org/learn/dev/developer-overview),
-[TRiBot script template](https://github.com/TribotRS/tribot-script-template).
+> **Correction (2026-06-11):** an earlier revision of this spec said a paid
+> subscription was required to develop — wrong, sourced from one overview page.
+> The official IntelliJ setup guide and the community automations repo confirm
+> building is free and needs no account.
+
+Sources: [TRiBot IntelliJ project setup](https://tribot.org/learn/dev/intellij-project-setup),
+[Tribot-Community-Automations](https://github.com/TribotRS/Tribot-Community-Automations),
+[Detuks — Java OSRS bot era is over](https://detuks.com/blog/java-osrs-bot-era-is-over-2926-overlook).
 
 ---
 
@@ -42,11 +50,12 @@ Sources: [Detuks — Java OSRS bot era is over](https://detuks.com/blog/java-osr
 
 | Area | Decision |
 |---|---|
-| **API target** | TRiBot **Automation SDK** (Echo-first) |
-| **Language** | Java (version pinned to the Echo SDK requirement — see Open Items) |
+| **API target** | TRiBot **Automation SDK** — `org.tribot.automation.TribotScript` + `ScriptContext` |
+| **SDK access** | Free via `id("org.tribot.dev")` Gradle plugin (JitPack); it supplies Automation SDK + Script SDK + RuneLite as `compileOnly`. No manual deps, no auth. |
+| **Language** | Java on **JDK 21** (hard requirement — Echo loads only JDK 21 class files) |
 | **Build system** | Gradle, **Kotlin DSL**, multi-module |
-| **Repo layout** | Mirror the official TRiBot template: `scripts/<name>` modules + shared `libraries/<name>` |
-| **Packaging** | Official Gradle tasks (`build`, `cleanBin`, `repoPackage`/`repoUpdate`) — **no** fat-JARs, **no** `~/.tribot/automations` copies |
+| **Repo layout** | `scripts/<name>` modules + shared `libraries/<name>` (validated by the community repo's `community-commons` + per-script modules) |
+| **Packaging** | `org.tribot.dev` tasks: `fatJar` + `deployLocally` → fat JAR into `%APPDATA%/.tribot/automations`; the plugin auto-generates the manifest |
 | **First & only script** | **Grand Exchange flipper**, single account |
 | **Dropped from old draft** | Miner, Lumbridge cow/chicken killer |
 | **Architecture** | **Task / state-machine framework** as the backbone every script uses |
@@ -98,9 +107,9 @@ Built first. Provides reusable capabilities so scripts stay thin:
 - **Per-item 4-hour buy-limit** tracking.
 
 ### Configuration & state
-- **RuneLite side panel** to configure capital, margin/volume thresholds, slot
-  usage, etc. (Fallback to Swing if the SDK doesn't expose a panel hook —
-  see Open Items.)
+- **In-client config UI** for capital, margin/volume thresholds, slot usage, etc.
+  The module's `tribot { }` block exposes `useCompose`/`useJavaFx` toggles; prefer
+  a RuneLite side panel if exposed, else Compose/JavaFX/Swing — see Open Items.
 - **Persisted state on disk** so the script resumes open offers and buy-limit
   timers after a restart or crash.
 
@@ -109,19 +118,29 @@ Built first. Provides reusable capabilities so scripts stay thin:
 
 ---
 
-## 5. Open Items — verify against the real SDK at setup
+## 5. Open Items
 
-These are **not decisions** but unknowns that cannot be closed until a paid
-subscription is active and the actual template/SDK jar is in hand (the user has
-nothing set up yet, and the paid SDK docs are not publicly readable):
+The major unknowns are now **resolved** from the official IntelliJ setup guide and
+the community automations repo:
 
-1. **Automation SDK entry point** — the real script class / annotation /
-   lifecycle (replaces the invented `main()` + `tribot-script.json`).
-2. **RuneLite side-panel hook** — whether the SDK exposes one for script GUIs;
-   if not, fall back to Swing/JavaFX.
-3. **JDK version** — template references Java 11; old draft said 17; the Echo
-   SDK is authoritative. Pin once confirmed.
-4. **Current Gradle plugin coordinates / task names** for the Echo template.
+- **Entry point — RESOLVED:** a script implements `org.tribot.automation.TribotScript`
+  with `void execute(ScriptContext context)`; the module's `tribot { }` block
+  registers it. (Replaces the invented `main()` + `tribot-script.json`.)
+- **SDK / build — RESOLVED:** `id("org.tribot.dev") version "latest.release"`
+  (JitPack) supplies the SDK as `compileOnly`; build with `fatJar`, deploy with
+  `deployLocally`. Repos: `mavenCentral`, `repo.runelite.net`, `jitpack.io`.
+- **JDK — RESOLVED:** JDK 21.
+- **Subscription — RESOLVED:** not required to develop or build.
+
+Remaining (confirm while coding Phase 3 — none block development):
+
+1. **Grand Exchange API surface** — the exact SDK class/methods to place, collect
+   and cancel GE offers and read offer/slot state (the miner example shows
+   `Inventory`, `Banking`, `Interaction`, `WorldViews`… but not GE). Confirm from
+   the plugin's bundled SDK / javadoc.
+2. **Config UI** — whether a RuneLite side panel is exposed, else Compose/JavaFX/Swing.
+3. **Running Echo** — whether a (free) account/login is needed to *run* a script.
+   Affects live testing only, not building.
 
 ---
 

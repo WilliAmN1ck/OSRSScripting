@@ -17,5 +17,11 @@
 - [x] 2.9 Task / state-machine framework (Task, TaskRunner)
 - [x] 35 tests, all green (`:libraries:core:test`)
 
-## Phase 3 — SDK integration & GE flipper  (BLOCKED: TRiBot subscription + SDK)
-## Phase 4 — Publish pipeline  (later / optional)
+## Phase 3 prep — branch `phase-3-prep` (2026-06-11)
+- [x] Confirmed development is FREE — SDK via the `org.tribot.dev` plugin (JitPack), no subscription
+- [x] Re-baselined JDK 11 → 21 (build.gradle.kts, CI, README); verified 35 tests green on 21
+- [x] Updated spec.md (decisions + Open Items) and plan.md (Phase 3 unblocked, real `TribotScript` API, fatJar/deployLocally)
+
+## Phase 3 — SDK integration & GE flipper  (dev UNBLOCKED; live run needs local TRiBot Echo)
+- TribotScript/ScriptContext entry point; FlipActionExecutor over the SDK GE API; config UI; deploy via fatJar/deployLocally
+## Phase 4 — Publish / distribution  (later / optional)
