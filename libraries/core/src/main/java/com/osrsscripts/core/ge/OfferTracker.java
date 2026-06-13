@@ -14,28 +14,29 @@ import java.util.Set;
 /**
  * Observes the 8 GE slots tick over tick and derives everything the client API does not expose:
  * offer placement times (first-seen, re-matched by slot + item + side + price), buy fills (fed to
- * the {@link BuyLimitLedger} and {@link StockLedger}), and realized, tax-aware profit from sell
- * fills against the consumed cost basis.
+ * the {@link BuyLimitLedger} and {@link StockLedger}), and realized profit from sell fills against
+ * the consumed cost basis.
  *
- * <p>Sell proceeds are computed as {@code price × fill delta}; the GE can fill at a better price
- * than asked, which this under-counts (the offer model carries no transferred-gold amount).
+ * <p>Money is measured by each offer's <em>transferred gold</em> — what was actually spent or
+ * received — so better-price fills are accounted exactly. Transferred gold for sells is taken as
+ * the collectable (post-tax) amount, so no further tax is subtracted here.
  *
- * <p>Stamps carry the last-seen fill count so a restart (via {@link #restore}) does not re-record
- * fills that happened before the previous shutdown.
+ * <p>Stamps carry the last-seen fill count and gold so a restart (via {@link #restore}) does not
+ * re-record fills that happened before the previous shutdown.
  */
 public final class OfferTracker {
 
     private final BuyLimitLedger buyLimits;
     private final StockLedger stock;
-    private final GeTax tax;
+    private final TradeHistory history;
     private final Map<Integer, Stamp> stamps = new HashMap<>();
     private long realizedProfit;
     private long flipsCompleted;
 
-    public OfferTracker(BuyLimitLedger buyLimits, StockLedger stock, GeTax tax) {
+    public OfferTracker(BuyLimitLedger buyLimits, StockLedger stock, TradeHistory history) {
         this.buyLimits = Objects.requireNonNull(buyLimits, "buyLimits");
         this.stock = Objects.requireNonNull(stock, "stock");
-        this.tax = Objects.requireNonNull(tax, "tax");
+        this.history = Objects.requireNonNull(history, "history");
     }
 
     /**
@@ -55,37 +56,43 @@ public final class OfferTracker {
             Stamp previous = stamps.get(offer.slot());
             Instant placedAt;
             int lastFilled;
+            long lastGold;
             if (previous != null && previous.matches(offer)) {
                 placedAt = previous.placedAt();
                 lastFilled = previous.filled();
+                lastGold = previous.transferredGold();
             } else {
                 placedAt = now;
                 lastFilled = 0;
+                lastGold = 0L;
             }
-            recordFillDelta(offer, offer.filled() - lastFilled, now);
+            recordFillDelta(offer, offer.filled() - lastFilled,
+                    offer.transferredGold() - lastGold, now);
             stamps.put(offer.slot(), new Stamp(offer.slot(), offer.itemId(), offer.side(),
-                    offer.pricePerItem(), offer.filled(), placedAt));
+                    offer.pricePerItem(), offer.filled(), offer.transferredGold(), placedAt));
             stamped.add(new GeOffer(offer.slot(), offer.status(), offer.side(), offer.itemId(),
-                    offer.pricePerItem(), offer.quantity(), offer.filled(), placedAt));
+                    offer.pricePerItem(), offer.quantity(), offer.filled(),
+                    offer.transferredGold(), placedAt));
         }
         stamps.keySet().removeIf(slot -> !seenSlots.contains(slot));
         return stamped;
     }
 
-    private void recordFillDelta(GeOffer offer, int delta, Instant now) {
+    private void recordFillDelta(GeOffer offer, int delta, long goldDelta, Instant now) {
         if (delta <= 0) {
             return;
         }
+        long gold = Math.max(0L, goldDelta);
         if (offer.side() == OfferSide.BUY) {
             buyLimits.recordPurchase(offer.itemId(), delta, now);
-            stock.recordBuy(offer.itemId(), delta, offer.pricePerItem());
+            long unitCost = Math.round((double) gold / delta);
+            stock.recordBuy(offer.itemId(), delta, unitCost);
         } else if (offer.side() == OfferSide.SELL) {
             long basis = stock.recordSell(offer.itemId(), delta);
-            long gross = (long) delta * offer.pricePerItem();
-            realizedProfit += gross
-                    - tax.taxOnSale(offer.itemId(), offer.pricePerItem(), delta)
-                    - basis;
-            if (offer.filled() == offer.quantity()) {
+            boolean completedFlip = offer.filled() == offer.quantity();
+            realizedProfit += gold - basis;
+            history.recordSale(offer.itemId(), delta, gold - basis, completedFlip, now);
+            if (completedFlip) {
                 flipsCompleted++;
             }
         }
@@ -118,22 +125,24 @@ public final class OfferTracker {
         this.flipsCompleted = flipsCompleted;
     }
 
-    /** The remembered identity, fill baseline, and placement time of one slot's offer. */
+    /** The remembered identity, fill/gold baseline, and placement time of one slot's offer. */
     public static final class Stamp {
         private final int slot;
         private final int itemId;
         private final OfferSide side;
         private final long pricePerItem;
         private final int filled;
+        private final long transferredGold;
         private final Instant placedAt;
 
         public Stamp(int slot, int itemId, OfferSide side, long pricePerItem, int filled,
-                     Instant placedAt) {
+                     long transferredGold, Instant placedAt) {
             this.slot = slot;
             this.itemId = itemId;
             this.side = Objects.requireNonNull(side, "side");
             this.pricePerItem = pricePerItem;
             this.filled = filled;
+            this.transferredGold = transferredGold;
             this.placedAt = Objects.requireNonNull(placedAt, "placedAt");
         }
 
@@ -161,6 +170,10 @@ public final class OfferTracker {
 
         public int filled() {
             return filled;
+        }
+
+        public long transferredGold() {
+            return transferredGold;
         }
 
         public Instant placedAt() {

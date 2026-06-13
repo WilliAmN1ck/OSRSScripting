@@ -15,15 +15,18 @@ public final class StatsSnapshot {
     private final long flipsCompleted;
     private final long cash;
     private final List<String> offerLines;
+    private final List<TradeRow> tradeRows;
 
     public StatsSnapshot(Duration runtime, long sessionProfit, long allTimeProfit,
-                         long flipsCompleted, long cash, List<String> offerLines) {
+                         long flipsCompleted, long cash, List<String> offerLines,
+                         List<TradeRow> tradeRows) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.sessionProfit = sessionProfit;
         this.allTimeProfit = allTimeProfit;
         this.flipsCompleted = flipsCompleted;
         this.cash = cash;
         this.offerLines = Collections.unmodifiableList(new ArrayList<>(offerLines));
+        this.tradeRows = Collections.unmodifiableList(new ArrayList<>(tradeRows));
     }
 
     public Duration runtime() {
@@ -48,5 +51,40 @@ public final class StatsSnapshot {
 
     public List<String> offerLines() {
         return offerLines;
+    }
+
+    public List<TradeRow> tradeRows() {
+        return tradeRows;
+    }
+
+    /** One trade-history table row, best net profit first. */
+    public static final class TradeRow {
+        private final String itemName;
+        private final long netProfit;
+        private final int flipsCompleted;
+        private final int qtySold;
+
+        public TradeRow(String itemName, long netProfit, int flipsCompleted, int qtySold) {
+            this.itemName = Objects.requireNonNull(itemName, "itemName");
+            this.netProfit = netProfit;
+            this.flipsCompleted = flipsCompleted;
+            this.qtySold = qtySold;
+        }
+
+        public String itemName() {
+            return itemName;
+        }
+
+        public long netProfit() {
+            return netProfit;
+        }
+
+        public int flipsCompleted() {
+            return flipsCompleted;
+        }
+
+        public int qtySold() {
+            return qtySold;
+        }
     }
 }

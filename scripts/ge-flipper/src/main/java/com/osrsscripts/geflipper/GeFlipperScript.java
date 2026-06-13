@@ -7,9 +7,11 @@ import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.humanize.DelayDistribution;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
+import com.osrsscripts.core.model.ItemMeta;
 import com.osrsscripts.core.persistence.PersistedState;
 import com.osrsscripts.core.persistence.StateMapper;
 import com.osrsscripts.core.persistence.StateStore;
@@ -22,7 +24,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.tribot.automation.TribotScript;
@@ -60,13 +64,14 @@ public final class GeFlipperScript implements TribotScript {
         GeTax tax = new GeTax(GeTaxRules.defaults());
         BuyLimitLedger ledger = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(ledger, stock, tax);
+        TradeHistory history = new TradeHistory();
+        OfferTracker tracker = new OfferTracker(ledger, stock, history);
         FlipActionExecutor executor = new FlipActionExecutor(client);
 
         Path stateFile = ScriptSettings.getDefault().getDirectory().toPath().resolve(STATE_FILE);
         StateStore store = new StateStore(stateFile);
         PersistedState loaded = store.load();
-        StateMapper.restore(loaded, ledger, stock, tracker);
+        StateMapper.restore(loaded, ledger, stock, tracker, history);
         long profitBaseline = loaded.realizedProfit();
         Consumer<PersistedState> persister = state -> {
             try {
@@ -79,7 +84,9 @@ public final class GeFlipperScript implements TribotScript {
         FlipConfig restoredConfig = StateMapper.restoredConfig(loaded);
         AtomicReference<FlipConfig> config =
                 new AtomicReference<>(restoredConfig != null ? restoredConfig : defaultConfig());
-        FlipperPanel panel = new FlipperPanel(config.get(), config::set);
+        AtomicBoolean clearHistoryRequest = new AtomicBoolean(false);
+        FlipperPanel panel = new FlipperPanel(config.get(), config::set,
+                () -> clearHistoryRequest.set(true));
         context.getSidebar().addSidebarTab(TAB_NAME, null, panel);
 
         // Echo's built-in action humanization, plus our own idle fidgets while slots sit full.
@@ -92,25 +99,28 @@ public final class GeFlipperScript implements TribotScript {
         List<Task> tasks = List.of(
                 new BreakIdleTask(new SdkBreakSource(context.getSidecars())),
                 new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                        config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle));
+                        history, config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle,
+                        clearHistoryRequest));
         TaskRunner runner = new TaskRunner(tasks);
 
         Instant startedAt = Instant.now();
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 runner.tick();
-                refreshStats(panel, client, tracker, profitBaseline, startedAt, context);
+                refreshStats(panel, client, tracker, history, prices, profitBaseline, startedAt,
+                        context);
                 context.getWaiting().sleep(TICK_INTERVAL_MS);
             }
         } finally {
             // Save first: a failure tearing down the sidebar must not cost us the final state.
-            persister.accept(StateMapper.snapshot(ledger, stock, tracker, config.get()));
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, history, config.get()));
             context.getSidebar().removeSidebarTab(TAB_NAME);
         }
     }
 
     /** Stats are a display nicety: a failed client read must never kill the loop. */
     private static void refreshStats(FlipperPanel panel, GeClient client, OfferTracker tracker,
+                                     TradeHistory history, WikiPriceClient prices,
                                      long profitBaseline, Instant startedAt,
                                      ScriptContext context) {
         try {
@@ -128,10 +138,29 @@ public final class GeFlipperScript implements TribotScript {
                     tracker.realizedProfit(),
                     tracker.flipsCompleted(),
                     client.coins(),
-                    offerLines));
+                    offerLines,
+                    tradeRows(history, prices)));
         } catch (RuntimeException e) {
             context.getLogger().warn("Skipping stats refresh", e);
         }
+    }
+
+    private static List<StatsSnapshot.TradeRow> tradeRows(TradeHistory history,
+                                                          WikiPriceClient prices) {
+        Map<Integer, ItemMeta> mapping;
+        try {
+            mapping = prices.mapping(); // long-lived cache; a miss only degrades names to ids
+        } catch (IOException e) {
+            mapping = Map.of();
+        }
+        List<StatsSnapshot.TradeRow> rows = new ArrayList<>();
+        for (TradeHistory.ItemRecord record : history.records()) {
+            ItemMeta meta = mapping.get(record.itemId());
+            String name = meta != null ? meta.name() : "#" + record.itemId();
+            rows.add(new StatsSnapshot.TradeRow(name, record.netProfit(),
+                    record.flipsCompleted(), record.qtySold()));
+        }
+        return rows;
     }
 
     /**
@@ -149,6 +178,8 @@ public final class GeFlipperScript implements TribotScript {
                 .minDeploymentGp(1_000L)
                 .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
+                .sellExitAfterRelists(3)
+                .avoidAfterLossGp(1_000L)
                 .build();
     }
 }

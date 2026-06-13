@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,22 @@ public final class FlipEngine {
                                    BuyLimitLedger ledger,
                                    FlipConfig config,
                                    Instant now) {
+        return decide(rankedCandidates, prices, account, ledger, config, now,
+                Collections.emptyMap());
+    }
+
+    /**
+     * As {@link #decide(List, Map, AccountState, BuyLimitLedger, FlipConfig, Instant)}, with
+     * per-item counts of consecutive stale sell relists: once an item's count reaches
+     * {@link FlipConfig#sellExitAfterRelists()}, its next listing exits at the insta-sell price.
+     */
+    public List<FlipAction> decide(List<FlipCandidate> rankedCandidates,
+                                   Map<Integer, PricePoint> prices,
+                                   AccountState account,
+                                   BuyLimitLedger ledger,
+                                   FlipConfig config,
+                                   Instant now,
+                                   Map<Integer, Integer> sellRelistCounts) {
         List<FlipAction> actions = new ArrayList<>();
         Deque<Integer> freeSlots = new ArrayDeque<>();
         Set<Integer> busyItems = new HashSet<>();
@@ -79,7 +96,8 @@ public final class FlipEngine {
                 break;
             }
             int slot = freeSlots.poll();
-            actions.add(FlipAction.placeSell(slot, itemId, price.high(), qty));
+            actions.add(FlipAction.placeSell(slot, itemId, sellPrice(price, itemId, config,
+                    sellRelistCounts), qty));
             busyItems.add(itemId);
             capacity--;
         }
@@ -134,5 +152,20 @@ public final class FlipEngine {
     /** Gp still committed to the unfilled remainder of a live buy offer. */
     private static long remainingCommitment(GeOffer buy) {
         return buy.pricePerItem() * (buy.quantity() - buy.filled());
+    }
+
+    /**
+     * The price to list a sell at: the insta-buy (high) price normally, dropping to the
+     * insta-sell (low) price once the item has been relisted stale too many times — taking the
+     * exit beats parking capital forever.
+     */
+    private static long sellPrice(PricePoint price, int itemId, FlipConfig config,
+                                  Map<Integer, Integer> sellRelistCounts) {
+        int threshold = config.sellExitAfterRelists();
+        if (threshold > 0 && price.hasLow()
+                && sellRelistCounts.getOrDefault(itemId, 0) >= threshold) {
+            return price.low();
+        }
+        return price.high();
     }
 }

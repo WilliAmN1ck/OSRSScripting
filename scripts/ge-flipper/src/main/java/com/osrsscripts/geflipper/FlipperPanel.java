@@ -17,9 +17,12 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableModel;
 
 /**
  * The sidebar tab: editable {@link FlipConfig} fields with an Apply button, and a live stats
@@ -38,7 +41,9 @@ public final class FlipperPanel extends JPanel {
         MIN_VOLUME("Min volume (units/h)"),
         MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
-        MAX_OFFER_AGE_MINUTES("Max offer age (minutes)");
+        MAX_OFFER_AGE_MINUTES("Max offer age (minutes)"),
+        SELL_EXIT_AFTER_RELISTS("Insta-sell after relists (0=off)"),
+        AVOID_AFTER_LOSS_GP("Avoid item after net loss (gp, 0=off)");
 
         private final String label;
 
@@ -47,19 +52,31 @@ public final class FlipperPanel extends JPanel {
         }
     }
 
+    private static final String[] HISTORY_COLUMNS = {"Item", "Net P/L", "Flips", "Qty"};
+
     private final Map<Field, JTextField> fields = new EnumMap<>(Field.class);
     private final JCheckBox membersCheckBox = new JCheckBox("Buy members items");
     private final JButton applyButton = new JButton("Apply");
+    private final JButton clearHistoryButton = new JButton("Clear history");
     private final JLabel errorLabel = new JLabel(" ");
-    private final JTextArea statsArea = new JTextArea(12, 24);
+    private final JTextArea statsArea = new JTextArea(8, 24);
+    private final DefaultTableModel historyModel = new DefaultTableModel(HISTORY_COLUMNS, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
     private final Consumer<FlipConfig> onApply;
 
-    public FlipperPanel(FlipConfig initial, Consumer<FlipConfig> onApply) {
+    public FlipperPanel(FlipConfig initial, Consumer<FlipConfig> onApply,
+                        Runnable onClearHistory) {
         super(new BorderLayout(0, 8));
         this.onApply = Objects.requireNonNull(onApply, "onApply");
+        Objects.requireNonNull(onClearHistory, "onClearHistory");
         add(buildConfigSection(Objects.requireNonNull(initial, "initial")), BorderLayout.NORTH);
         add(buildStatsSection(), BorderLayout.CENTER);
         applyButton.addActionListener(e -> apply());
+        clearHistoryButton.addActionListener(e -> onClearHistory.run());
     }
 
     private JPanel buildConfigSection(FlipConfig initial) {
@@ -97,11 +114,22 @@ public final class FlipperPanel extends JPanel {
     }
 
     private JPanel buildStatsSection() {
-        JPanel section = new JPanel(new BorderLayout());
-        section.setBorder(BorderFactory.createTitledBorder("Stats"));
+        JPanel stats = new JPanel(new BorderLayout());
+        stats.setBorder(BorderFactory.createTitledBorder("Stats"));
         statsArea.setEditable(false);
         statsArea.setOpaque(false);
-        section.add(statsArea, BorderLayout.CENTER);
+        stats.add(statsArea, BorderLayout.CENTER);
+
+        JPanel history = new JPanel(new BorderLayout(0, 4));
+        history.setBorder(BorderFactory.createTitledBorder("Trade history"));
+        JTable table = new JTable(historyModel);
+        table.setFillsViewportHeight(true);
+        history.add(new JScrollPane(table), BorderLayout.CENTER);
+        history.add(clearHistoryButton, BorderLayout.SOUTH);
+
+        JPanel section = new JPanel(new BorderLayout(0, 8));
+        section.add(stats, BorderLayout.NORTH);
+        section.add(history, BorderLayout.CENTER);
         return section;
     }
 
@@ -123,6 +151,10 @@ public final class FlipperPanel extends JPanel {
                 return Integer.toString(config.maxSlots());
             case MAX_OFFER_AGE_MINUTES:
                 return Long.toString(config.maxOfferAge().toMinutes());
+            case SELL_EXIT_AFTER_RELISTS:
+                return Integer.toString(config.sellExitAfterRelists());
+            case AVOID_AFTER_LOSS_GP:
+                return Long.toString(config.avoidAfterLossGp());
             default:
                 throw new AssertionError(field);
         }
@@ -158,6 +190,9 @@ public final class FlipperPanel extends JPanel {
                 .maxSlots(maxSlots)
                 .maxOfferAge(Duration.ofMinutes(maxOfferAgeMinutes))
                 .membersItemsAllowed(membersCheckBox.isSelected())
+                .sellExitAfterRelists((int) Math.min(parseLong(Field.SELL_EXIT_AFTER_RELISTS, 0),
+                        Integer.MAX_VALUE))
+                .avoidAfterLossGp(parseLong(Field.AVOID_AFTER_LOSS_GP, 0))
                 .build();
     }
 
@@ -201,7 +236,14 @@ public final class FlipperPanel extends JPanel {
         for (String line : snapshot.offerLines()) {
             text.append("  ").append(line).append('\n');
         }
-        SwingUtilities.invokeLater(() -> statsArea.setText(text.toString()));
+        SwingUtilities.invokeLater(() -> {
+            statsArea.setText(text.toString());
+            historyModel.setRowCount(0);
+            for (StatsSnapshot.TradeRow row : snapshot.tradeRows()) {
+                historyModel.addRow(new Object[] {row.itemName(), gp(row.netProfit()),
+                        row.flipsCompleted(), row.qtySold()});
+            }
+        });
     }
 
     private static String formatRuntime(Duration runtime) {
@@ -222,6 +264,14 @@ public final class FlipperPanel extends JPanel {
 
     void setMembersAllowed(boolean allowed) {
         membersCheckBox.setSelected(allowed);
+    }
+
+    void clickClearHistory() {
+        clearHistoryButton.doClick();
+    }
+
+    int historyRowCount() {
+        return historyModel.getRowCount();
     }
 
     void clickApply() {

@@ -19,6 +19,8 @@ public final class PersistedConfig {
     private final long maxOfferAgeMinutes;
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
+    private final int sellExitAfterRelists;
+    private final long avoidAfterLossGp;
 
     @JsonCreator
     public PersistedConfig(@JsonProperty("capitalCap") long capitalCap,
@@ -29,7 +31,9 @@ public final class PersistedConfig {
                            @JsonProperty("maxSlots") int maxSlots,
                            @JsonProperty("maxOfferAgeMinutes") long maxOfferAgeMinutes,
                            @JsonProperty("membersItemsAllowed") boolean membersItemsAllowed,
-                           @JsonProperty("minDeploymentGp") long minDeploymentGp) {
+                           @JsonProperty("minDeploymentGp") long minDeploymentGp,
+                           @JsonProperty("sellExitAfterRelists") int sellExitAfterRelists,
+                           @JsonProperty("avoidAfterLossGp") long avoidAfterLossGp) {
         this.capitalCap = capitalCap;
         this.perItemCapitalCap = perItemCapitalCap;
         this.minMarginGp = minMarginGp;
@@ -39,6 +43,8 @@ public final class PersistedConfig {
         this.maxOfferAgeMinutes = maxOfferAgeMinutes;
         this.membersItemsAllowed = membersItemsAllowed;
         this.minDeploymentGp = minDeploymentGp;
+        this.sellExitAfterRelists = sellExitAfterRelists;
+        this.avoidAfterLossGp = avoidAfterLossGp;
     }
 
     public long capitalCap() {
@@ -77,6 +83,14 @@ public final class PersistedConfig {
         return minDeploymentGp;
     }
 
+    public int sellExitAfterRelists() {
+        return sellExitAfterRelists;
+    }
+
+    public long avoidAfterLossGp() {
+        return avoidAfterLossGp;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -94,13 +108,16 @@ public final class PersistedConfig {
                 && maxSlots == other.maxSlots
                 && maxOfferAgeMinutes == other.maxOfferAgeMinutes
                 && membersItemsAllowed == other.membersItemsAllowed
-                && minDeploymentGp == other.minDeploymentGp;
+                && minDeploymentGp == other.minDeploymentGp
+                && sellExitAfterRelists == other.sellExitAfterRelists
+                && avoidAfterLossGp == other.avoidAfterLossGp;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(capitalCap, perItemCapitalCap, minMarginGp, minMarginPct, minVolume,
-                maxSlots, maxOfferAgeMinutes, membersItemsAllowed, minDeploymentGp);
+                maxSlots, maxOfferAgeMinutes, membersItemsAllowed, minDeploymentGp,
+                sellExitAfterRelists, avoidAfterLossGp);
     }
 
     @Override

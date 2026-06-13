@@ -28,7 +28,7 @@ class OfferMapperTest {
 
     @Test
     void toGeOfferAssemblesOfferWithoutTimestamp() {
-        GeOffer offer = OfferMapper.toGeOffer(3, "IN_PROGRESS", "BUY", 1234, 100, 50, 10);
+        GeOffer offer = OfferMapper.toGeOffer(3, "IN_PROGRESS", "BUY", 1234, 100, 50, 10, 980L);
 
         assertEquals(3, offer.slot());
         assertEquals(OfferStatus.PARTIAL, offer.status());
@@ -37,12 +37,13 @@ class OfferMapperTest {
         assertEquals(100, offer.pricePerItem());
         assertEquals(50, offer.quantity());
         assertEquals(10, offer.filled());
+        assertEquals(980L, offer.transferredGold(), "actual gold moved, not price x filled");
         assertNull(offer.placedAt(), "SDK exposes no placement time");
     }
 
     @Test
     void toGeOfferLeavesSideNullForEmptySlot() {
-        GeOffer offer = OfferMapper.toGeOffer(1, "EMPTY", "BUY", 0, 0, 0, 0);
+        GeOffer offer = OfferMapper.toGeOffer(1, "EMPTY", "BUY", 0, 0, 0, 0, 0L);
 
         assertEquals(OfferStatus.EMPTY, offer.status());
         assertNull(offer.side());
@@ -50,8 +51,8 @@ class OfferMapperTest {
 
     @Test
     void fillEightSlotsReturnsAllSlotsInOrderFillingGaps() {
-        GeOffer atTwo = OfferMapper.toGeOffer(2, "IN_PROGRESS", "SELL", 7, 10, 1, 0);
-        GeOffer atFive = OfferMapper.toGeOffer(5, "COMPLETED", "BUY", 9, 20, 2, 2);
+        GeOffer atTwo = OfferMapper.toGeOffer(2, "IN_PROGRESS", "SELL", 7, 10, 1, 0, 0L);
+        GeOffer atFive = OfferMapper.toGeOffer(5, "COMPLETED", "BUY", 9, 20, 2, 2, 40L);
 
         List<GeOffer> all = OfferMapper.fillEightSlots(List.of(atFive, atTwo));
 

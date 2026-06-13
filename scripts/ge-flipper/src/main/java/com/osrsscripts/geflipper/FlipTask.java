@@ -1,5 +1,6 @@
 package com.osrsscripts.geflipper;
 
+import com.osrsscripts.core.ge.ActionType;
 import com.osrsscripts.core.ge.BuyLimitLedger;
 import com.osrsscripts.core.ge.FlipAction;
 import com.osrsscripts.core.ge.FlipEngine;
@@ -7,11 +8,14 @@ import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.model.AccountState;
 import com.osrsscripts.core.model.FlipCandidate;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.OfferSide;
+import com.osrsscripts.core.model.OfferStatus;
 import com.osrsscripts.core.model.PricePoint;
 import com.osrsscripts.core.model.VolumePoint;
 import com.osrsscripts.core.persistence.PersistedState;
@@ -21,10 +25,12 @@ import com.osrsscripts.core.task.Task;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -58,14 +64,17 @@ public final class FlipTask implements Task {
     private final Consumer<PersistedState> persister;
     private final Duration retryBackoff;
     private final IdleBehavior idle;
+    private final TradeHistory history;
+    private final AtomicBoolean clearHistoryRequest;
+    private final Map<Integer, Integer> sellRelists = new HashMap<>();
     private Instant retryAfter = Instant.MIN;
     private int idleTicks;
 
     public FlipTask(GeClient client, WikiPriceClient prices, FlipScanner scanner, FlipEngine engine,
                     GeTax tax, BuyLimitLedger ledger, StockLedger stock, OfferTracker tracker,
-                    Supplier<FlipConfig> config, FlipActionExecutor executor,
+                    TradeHistory history, Supplier<FlipConfig> config, FlipActionExecutor executor,
                     Consumer<PersistedState> persister, Duration retryBackoff,
-                    IdleBehavior idle) {
+                    IdleBehavior idle, AtomicBoolean clearHistoryRequest) {
         this.client = Objects.requireNonNull(client, "client");
         this.prices = Objects.requireNonNull(prices, "prices");
         this.scanner = Objects.requireNonNull(scanner, "scanner");
@@ -79,6 +88,9 @@ public final class FlipTask implements Task {
         this.persister = Objects.requireNonNull(persister, "persister");
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff");
         this.idle = Objects.requireNonNull(idle, "idle");
+        this.history = Objects.requireNonNull(history, "history");
+        this.clearHistoryRequest = Objects.requireNonNull(clearHistoryRequest,
+                "clearHistoryRequest");
     }
 
     @Override
@@ -88,6 +100,13 @@ public final class FlipTask implements Task {
 
     @Override
     public void execute() {
+        if (clearHistoryRequest.getAndSet(false)) {
+            // Raised by the sidebar's Clear button (EDT); applied here on the script thread,
+            // ahead of the market fetch so an outage cannot delay it, and persisted at once so
+            // a crash cannot resurrect the cleared records.
+            history.clear();
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, history, config.get()));
+        }
         Map<Integer, ItemMeta> mapping;
         Map<Integer, PricePoint> latest;
         Map<Integer, VolumePoint> volumes;
@@ -103,13 +122,24 @@ public final class FlipTask implements Task {
         Instant now = Instant.now();
         FlipConfig currentConfig = config.get();
         List<GeOffer> offers = tracker.observe(client.offers(), now);
+        for (GeOffer offer : offers) {
+            // A completed sell ends the item's losing streak; relist pressure resets.
+            if (!offer.isEmpty() && offer.side() == OfferSide.SELL
+                    && offer.status() == OfferStatus.COMPLETE) {
+                sellRelists.remove(offer.itemId());
+            }
+        }
         if (now.isBefore(retryAfter)) {
             return; // backing off after a failed placement; keep observing, stop acting
         }
-        AccountState account = new AccountState(client.coins(), offers, sellableStock());
+        AccountState account =
+                new AccountState(client.coins(), offers, sellableStock(mapping, currentConfig));
         List<FlipCandidate> candidates = scanner.scan(mapping, latest, volumes, currentConfig, tax);
+        // History has the final word: items that keep losing money stop being candidates.
+        candidates.removeIf(
+                c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
         List<FlipAction> actions =
-                engine.decide(candidates, latest, account, ledger, currentConfig, now);
+                engine.decide(candidates, latest, account, ledger, currentConfig, now, sellRelists);
         if (actions.isEmpty()) {
             // Nothing to do (e.g. every slot committed): after a short grace period close the
             // GE — a human doesn't stare at a static interface — and fidget occasionally.
@@ -130,18 +160,47 @@ public final class FlipTask implements Task {
         if (!executor.execute(actions)) {
             retryAfter = now.plus(retryBackoff);
         }
+        countCancelledSells(actions, offers);
         ledger.prune(now);
-        persister.accept(StateMapper.snapshot(ledger, stock, tracker, currentConfig));
+        persister.accept(StateMapper.snapshot(ledger, stock, tracker, history, currentConfig));
+    }
+
+    /**
+     * Each cancelled live sell is one failed listing for its item; enough of them and the engine
+     * exits at the insta-sell price. (A failed abort can re-count next tick — that only hastens
+     * the exit, which errs in the safe direction.) Counts are in-memory: a restart loses at most
+     * the current streaks, which rebuild within a few offer-age cycles.
+     */
+    private void countCancelledSells(List<FlipAction> actions, List<GeOffer> offers) {
+        for (FlipAction action : actions) {
+            if (action.type() != ActionType.CANCEL) {
+                continue;
+            }
+            for (GeOffer offer : offers) {
+                if (offer.slot() == action.slot() && offer.isLive()
+                        && offer.side() == OfferSide.SELL) {
+                    sellRelists.merge(offer.itemId(), 1, Integer::sum);
+                }
+            }
+        }
     }
 
     /**
      * Inventory restricted to what the flipper bought: per item the lesser of what is in the
-     * inventory and what the stock ledger says we own. Pre-owned items are never offered.
+     * inventory and what the stock ledger says we own. Pre-owned items are never offered, and on
+     * an F2P configuration neither are members items (the GE would reject the offer every tick).
      */
-    private Map<Integer, Integer> sellableStock() {
+    private Map<Integer, Integer> sellableStock(Map<Integer, ItemMeta> mapping,
+                                                FlipConfig currentConfig) {
         Map<Integer, Integer> sellable = new LinkedHashMap<>();
         Map<Integer, Integer> owned = stock.ownedQuantities();
         for (Map.Entry<Integer, Integer> entry : client.stock().entrySet()) {
+            if (!currentConfig.membersItemsAllowed()) {
+                ItemMeta meta = mapping.get(entry.getKey());
+                if (meta == null || meta.members()) {
+                    continue;
+                }
+            }
             int ownedQty = owned.getOrDefault(entry.getKey(), 0);
             int qty = Math.min(entry.getValue(), ownedQty);
             if (qty > 0) {

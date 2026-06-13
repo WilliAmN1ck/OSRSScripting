@@ -19,9 +19,11 @@ class StateStoreTest {
                 Arrays.asList(new LedgerEntry(561, 100, 1_700_000_000_000L),
                         new LedgerEntry(4151, 1, 1_700_000_500_000L)),
                 Arrays.asList(new StockEntry(4151, 3, 100_000L)),
-                Arrays.asList(new OfferStampEntry(1, 4151, "SELL", 150_000L, 2,
+                Arrays.asList(new OfferStampEntry(1, 4151, "SELL", 150_000L, 2, 300_000L,
                         1_700_000_600_000L)),
-                new PersistedConfig(116_000L, 25_000L, 2L, 0.01, 5_000L, 3, 30L, false, 1_000L),
+                Arrays.asList(new TradeRecordEntry(4151, 470L, 1, 10, 1_700_000_700_000L)),
+                new PersistedConfig(116_000L, 25_000L, 2L, 0.01, 5_000L, 3, 30L, false, 1_000L, 3,
+                        2_000L),
                 123_456L, 7L);
 
         store.save(original);

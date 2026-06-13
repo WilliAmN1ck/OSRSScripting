@@ -3,6 +3,7 @@ package com.osrsscripts.core.persistence;
 import com.osrsscripts.core.ge.BuyLimitLedger;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.OfferSide;
 import java.time.Duration;
@@ -20,7 +21,8 @@ public final class StateMapper {
     }
 
     public static PersistedState snapshot(BuyLimitLedger buyLimits, StockLedger stock,
-                                          OfferTracker tracker, FlipConfig config) {
+                                          OfferTracker tracker, TradeHistory history,
+                                          FlipConfig config) {
         List<LedgerEntry> ledgerEntries = new ArrayList<>();
         for (BuyLimitLedger.Purchase p : buyLimits.purchases()) {
             ledgerEntries.add(new LedgerEntry(p.itemId(), p.qty(), p.at().toEpochMilli()));
@@ -32,14 +34,21 @@ public final class StateMapper {
         List<OfferStampEntry> stampEntries = new ArrayList<>();
         for (OfferTracker.Stamp s : tracker.stamps()) {
             stampEntries.add(new OfferStampEntry(s.slot(), s.itemId(), s.side().name(),
-                    s.pricePerItem(), s.filled(), s.placedAt().toEpochMilli()));
+                    s.pricePerItem(), s.filled(), s.transferredGold(),
+                    s.placedAt().toEpochMilli()));
+        }
+        List<TradeRecordEntry> tradeEntries = new ArrayList<>();
+        for (TradeHistory.ItemRecord r : history.records()) {
+            tradeEntries.add(new TradeRecordEntry(r.itemId(), r.netProfit(), r.flipsCompleted(),
+                    r.qtySold(), r.lastTradedEpochMillis()));
         }
         PersistedConfig persistedConfig = new PersistedConfig(config.capitalCap(),
                 config.perItemCapitalCap(), config.minMarginGp(), config.minMarginPct(),
                 config.minVolume(), config.maxSlots(), config.maxOfferAge().toMinutes(),
-                config.membersItemsAllowed(), config.minDeploymentGp());
-        return new PersistedState(ledgerEntries, stockEntries, stampEntries, persistedConfig,
-                tracker.realizedProfit(), tracker.flipsCompleted());
+                config.membersItemsAllowed(), config.minDeploymentGp(),
+                config.sellExitAfterRelists(), config.avoidAfterLossGp());
+        return new PersistedState(ledgerEntries, stockEntries, stampEntries, tradeEntries,
+                persistedConfig, tracker.realizedProfit(), tracker.flipsCompleted());
     }
 
     /** The persisted run configuration, or {@code null} when the state predates it. */
@@ -58,11 +67,13 @@ public final class StateMapper {
                 .maxOfferAge(Duration.ofMinutes(c.maxOfferAgeMinutes()))
                 .membersItemsAllowed(c.membersItemsAllowed())
                 .minDeploymentGp(c.minDeploymentGp())
+                .sellExitAfterRelists(c.sellExitAfterRelists())
+                .avoidAfterLossGp(c.avoidAfterLossGp())
                 .build();
     }
 
     public static void restore(PersistedState state, BuyLimitLedger buyLimits, StockLedger stock,
-                               OfferTracker tracker) {
+                               OfferTracker tracker, TradeHistory history) {
         List<BuyLimitLedger.Purchase> purchases = new ArrayList<>();
         for (LedgerEntry e : state.ledgerEntries()) {
             purchases.add(new BuyLimitLedger.Purchase(e.itemId(), e.qty(),
@@ -84,9 +95,21 @@ public final class StateMapper {
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 continue; // fail safe: a stamp we cannot read is just re-stamped first-seen
             }
+            // Files written before gold tracking carry no baseline; approximate it from the
+            // listed price so the first observe after upgrade does not re-count old fills.
+            long gold = e.transferredGold() == 0L && e.filled() > 0
+                    ? e.pricePerItem() * e.filled()
+                    : e.transferredGold();
             stamps.add(new OfferTracker.Stamp(e.slot(), e.itemId(), side, e.pricePerItem(),
-                    e.filled(), Instant.ofEpochMilli(e.placedAtEpochMillis())));
+                    e.filled(), gold, Instant.ofEpochMilli(e.placedAtEpochMillis())));
         }
         tracker.restore(stamps, state.realizedProfit(), state.flipsCompleted());
+
+        List<TradeHistory.ItemRecord> tradeRecords = new ArrayList<>();
+        for (TradeRecordEntry e : state.tradeHistory()) {
+            tradeRecords.add(new TradeHistory.ItemRecord(e.itemId(), e.netProfit(),
+                    e.flipsCompleted(), e.qtySold(), e.lastTradedEpochMillis()));
+        }
+        history.load(tradeRecords);
     }
 }
