@@ -15,20 +15,25 @@ public final class StatsSnapshot {
     private final long allTimeProfit;
     private final long flipsCompleted;
     private final long cash;
+    private final long openBuyCapital;
     private final List<String> offerLines;
     private final List<TradeRow> tradeRows;
+    private final int itemsAvoided;
     private final IdleReason idleReason;
 
     public StatsSnapshot(Duration runtime, long sessionProfit, long allTimeProfit,
-                         long flipsCompleted, long cash, List<String> offerLines,
-                         List<TradeRow> tradeRows, IdleReason idleReason) {
+                         long flipsCompleted, long cash, long openBuyCapital,
+                         List<String> offerLines, List<TradeRow> tradeRows, int itemsAvoided,
+                         IdleReason idleReason) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.sessionProfit = sessionProfit;
         this.allTimeProfit = allTimeProfit;
         this.flipsCompleted = flipsCompleted;
         this.cash = cash;
+        this.openBuyCapital = openBuyCapital;
         this.offerLines = Collections.unmodifiableList(new ArrayList<>(offerLines));
         this.tradeRows = Collections.unmodifiableList(new ArrayList<>(tradeRows));
+        this.itemsAvoided = itemsAvoided;
         this.idleReason = Objects.requireNonNull(idleReason, "idleReason");
     }
 
@@ -52,12 +57,22 @@ public final class StatsSnapshot {
         return cash;
     }
 
+    /** Gp committed to currently open buy offers — how much of the bankroll is working. */
+    public long openBuyCapital() {
+        return openBuyCapital;
+    }
+
     public List<String> offerLines() {
         return offerLines;
     }
 
     public List<TradeRow> tradeRows() {
         return tradeRows;
+    }
+
+    /** Number of items the loss-guard is currently excluding from buys. */
+    public int itemsAvoided() {
+        return itemsAvoided;
     }
 
     public IdleReason idleReason() {

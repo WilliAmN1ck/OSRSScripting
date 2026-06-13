@@ -145,6 +145,13 @@
 - [x] Tests: falling-knife skip, mild-dip no-trip, 5m-fresh margin, /5m parse, 5m-failure degradation. Suite + fatJar green. Reviewed (1 self-finding fixed).
 - [ ] Live soak: skips a clearly falling item, fills slots normally.
 
+## Live performance stats — branch `live-stats` (2026-06-13)
+- handoff in docs/plans/live-stats/. Observability for the live run (user picked this + win/loss).
+- [x] StatsSnapshot: openBuyCapital + itemsAvoided fields. GeFlipperScript.refreshStats computes
+      deployed capital (open buys) + avoided count (history.shouldAvoid w/ config threshold).
+- [x] FlipperPanel: Profit/hr (session profit / runtime), Items U up / D down, Avoided (losses),
+      In buy offers. profit/hr + win/loss derived in-panel (no extra snapshot fields).
+- [x] Tests: panel asserts profit/hr 313, 1 up/1 down, avoided 1, 1.8M deployed. Suite + fatJar green.
 ## Sell-side crash exit — branch `sell-crash-exit` (2026-06-13)
 - handoff in docs/plans/sell-crash-exit/. Mirror of the buy guard for held positions.
 - [x] MarketTrend (core): shared falling-knife rule + DEFAULT_DROP 5%. FlipScanner uses it (private copy removed).
