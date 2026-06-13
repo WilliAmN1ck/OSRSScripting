@@ -98,16 +98,14 @@ backoff, open backoff), `FlipActionExecutorTest` (failure reporting ×2).
   is waiting to sell with no free slot — this closes the 25-minute amulet-wait finding.
 
 ## Known Issues / Tech Debt
-- **Members stock bought before disabling the filter** would still be offered for sale on
-  F2P (the sell pass doesn't check membership) — the placement fails and backs off, so
-  it's churn-bounded, but the capital stays stuck. Edge case; note for the engine.
-- **The deployed build is one commit behind** (the abort/collect/open backoff fix landed
-  after the last deploy); run `deployLocally` and restart at the next opportunity.
-- Profit under-counts better-price fills (carried from 3c); sell-exit escalation still
-  deferred (3c decision 9 — the soak showed aggressive `maxOfferAge` values churn profit
-  away, which is exactly the data that decision wanted).
 - Items 2 (CLI) and 7 (breaks) remain to be exercised; both are config/launch-side, no
   code expected.
+
+> **Resolved since (PR #8, [handoff-tech-debt.md](../post-phase-3-maintenance/handoff-tech-debt.md)):**
+> members-stock-on-F2P (now filtered in the sell pass), profit under-counting better-price
+> fills (now accounted by transferred gold), and sell-exit escalation (now
+> `sellExitAfterRelists`). The "deployed build one commit behind" note is also stale — the
+> build has been redeployed many times since.
 
 ## Verification Commands
 
