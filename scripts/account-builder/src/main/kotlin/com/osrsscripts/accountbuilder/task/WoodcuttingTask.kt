@@ -18,9 +18,10 @@ import org.tribot.script.sdk.util.TribotRandom
 
 /**
  * Woodcutting as a [BuilderTask]: complete once Woodcutting reaches the target level; otherwise chop
- * the nearest reachable user-selected, level-gated tree, bank all-but-axe at the nearest bank when
- * full, and return to the remembered chop spot. Each step keys off observable game state, so it is
- * re-entrant and safe to interrupt. (Execute is SDK-coupled and verified live.)
+ * the best (highest-level) reachable user-selected, level-gated tree — so it upgrades automatically as
+ * the account levels — bank all-but-axe at the nearest bank when full, and return to the remembered
+ * chop spot. Each step keys off observable game state, so it is re-entrant and safe to interrupt.
+ * (Execute is SDK-coupled and verified live.)
  */
 internal class WoodcuttingTask(
     private val allowedTrees: () -> Set<TreeType>,
@@ -59,12 +60,18 @@ internal class WoodcuttingTask(
         val allowed = allowedTrees()
         if (allowed.isEmpty()) return // validate() gates this; guards the rare unselect-mid-tick race
 
-        val tree = Query.gameObjects()
-            .actionEquals("Chop down")
-            .filter { obj -> allowed.any { it.matches(obj.name) } }
-            .isReachable
-            .findClosest()
-            .orElse(null)
+        // Prefer the best (highest-level) qualified tree that's reachable, falling back to lower ones,
+        // so the bot upgrades automatically as Woodcutting levels up.
+        val tree = allowed
+            .sortedByDescending { it.levelReq }
+            .firstNotNullOfOrNull { type ->
+                Query.gameObjects()
+                    .actionEquals("Chop down")
+                    .filter { obj -> type.matches(obj.name) }
+                    .isReachable
+                    .findClosest()
+                    .orElse(null)
+            }
 
         if (tree == null) {
             val spot = chopSpot

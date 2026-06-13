@@ -221,6 +221,9 @@
       pure core.humanize (fatigue cadence + look-away AFK). 30 tests green.
 - [x] Edge-case review: FIXED critical watchdog false-stop after breaks (reset on break/logout) +
       widened stall window to 10 min; "nothing runnable" now a single periodic status line (#4). 31 tests.
+- [x] 2nd thorough review → hands-off progression: pre-select any tree (locked ones labelled
+      "unlocks at N"); chop the BEST qualified reachable tree; auto-upgrades as WC levels. Panel test. 35 tests.
+      NOTE: cross-location upgrade (walking to higher-tree spots as you level) is a future feature.
 - [ ] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check; bank PIN handling;
       random-event / non-break-logout (login handler) behaviour.
 - [ ] Deferred (need client / extraction): SDK fidgets (need sdk-support SdkFidget extraction);
