@@ -202,6 +202,24 @@ class FlipTaskTest {
     }
 
     @Test
+    void fiveMinuteFetchFailureDegradesToHourlyInsteadOfSkipping() {
+        client.open = true;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        CannedFetcher canned = new CannedFetcher();
+
+        task(url -> {
+            if (url.endsWith("/5m")) {
+                throw new IOException("5m endpoint down");
+            }
+            return canned.get(url);
+        }).execute();
+
+        assertEquals(1, client.buys.size(), "a 5m outage must not stop flipping");
+        assertArrayEquals(new int[] {100, 100, 10}, client.buys.get(0));
+    }
+
+    @Test
     void staleTrackedOfferIsCancelled() {
         client.open = true;
         client.coins = 0L;
@@ -396,6 +414,9 @@ class FlipTaskTest {
                         + "\"highPriceVolume\":5000,\"lowPriceVolume\":5000},"
                         + "\"200\":{\"avgHighPrice\":300,\"avgLowPrice\":250,"
                         + "\"highPriceVolume\":5000,\"lowPriceVolume\":5000}}}";
+            }
+            if (url.endsWith("/5m")) {
+                return "{\"data\":{}}"; // no recent window: scanner falls back to the hour averages
             }
             throw new IllegalArgumentException("unexpected url: " + url);
         }

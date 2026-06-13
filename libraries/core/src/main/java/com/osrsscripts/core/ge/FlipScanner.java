@@ -11,21 +11,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Selects and ranks flip candidates from live market data. The margin decision uses the trailing
- * hour's <em>averaged</em> prices (insta-sell {@code avgLow} to buy, insta-buy {@code avgHigh} to
- * sell) so a single outlier trade cannot bait a bad item; offers are still <em>placed</em> at the
- * current {@code /latest} price so they fill at market. Liquidity is the lesser of the two
- * directional volumes — a round-trip must fill both a buy and a sell — and candidates are ranked
- * by estimated profit per hour, breaking ties toward the offer that deploys the most capital.
+ * Selects and ranks flip candidates from live market data. The margin decision uses averaged
+ * prices (insta-sell {@code avgLow} to buy, insta-buy {@code avgHigh} to sell) so a single outlier
+ * trade cannot bait a bad item — the fresher five-minute averages when an item is actively trading
+ * both sides, else the trailing hour's. Items whose five-minute price has dropped sharply below the
+ * hour (a falling knife) are skipped for buying. Offers are still <em>placed</em> at the current
+ * {@code /latest} price so they fill at market. Liquidity is the lesser of the two directional
+ * volumes — a round-trip must fill both a buy and a sell — and candidates are ranked by estimated
+ * profit per hour, breaking ties toward the offer that deploys the most capital.
  */
 public final class FlipScanner {
 
     /** A 4-hour buy limit spread over the hours the rate is measured in. */
     private static final double BUY_LIMIT_HOURS = 4.0;
 
+    /** Skip a buy when the 5-minute average has fallen this far below the hour — a falling knife. */
+    private static final double DOWNTREND_DROP = 0.05;
+
     public List<FlipCandidate> scan(Map<Integer, ItemMeta> mapping,
                                     Map<Integer, PricePoint> latest,
                                     Map<Integer, MarketStat> hourly,
+                                    Map<Integer, MarketStat> fiveMinute,
                                     FlipConfig config,
                                     GeTax tax) {
         List<FlipCandidate> candidates = new ArrayList<>();
@@ -33,15 +39,25 @@ public final class FlipScanner {
         for (Map.Entry<Integer, MarketStat> entry : hourly.entrySet()) {
             int itemId = entry.getKey();
             MarketStat stat = entry.getValue();
-            long avgBuy = stat.avgLowPrice();
-            long avgSell = stat.avgHighPrice();
-            if (avgBuy <= 0 || avgSell <= 0) {
-                continue; // no trades on a side this hour: can't price it reliably
-            }
+            MarketStat recent = fiveMinute.get(itemId);
 
+            // Liquidity uses the hour's volume (more data); a flip strands if either side is thin.
             long balancedVolume = stat.balancedVolume();
             if (balancedVolume < config.minVolume()) {
-                continue; // illiquid on at least one side: a flip would strand here
+                continue;
+            }
+
+            if (isFallingKnife(recent, stat)) {
+                continue; // sell-side price dropping sharply: don't buy into the crash
+            }
+
+            // Price the decision off the fresher 5-minute averages when the item is actively
+            // trading both sides there, otherwise the steadier hour averages.
+            MarketStat priceStat = hasBothSides(recent) ? recent : stat;
+            long avgBuy = priceStat.avgLowPrice();
+            long avgSell = priceStat.avgHighPrice();
+            if (avgBuy <= 0 || avgSell <= 0) {
+                continue; // no trades on a side: can't price it reliably
             }
 
             long margin = tax.netMarginPerItem(itemId, avgBuy, avgSell);
@@ -78,6 +94,22 @@ public final class FlipScanner {
                         (FlipCandidate c) -> capitalDeployed(c, perItemCap)).reversed())
                 .thenComparingInt(FlipCandidate::itemId));
         return candidates;
+    }
+
+    /** Whether a stat priced both sides in its window, so its averages are usable. */
+    private static boolean hasBothSides(MarketStat stat) {
+        return stat != null && stat.avgHighPrice() > 0 && stat.avgLowPrice() > 0;
+    }
+
+    /**
+     * Whether the recent (5-minute) sell-side price has dropped sharply below the hour's — a
+     * falling knife the bot would buy into only to sell lower. Needs both prices to compare.
+     */
+    private static boolean isFallingKnife(MarketStat recent, MarketStat hour) {
+        if (recent == null || recent.avgLowPrice() <= 0 || hour.avgLowPrice() <= 0) {
+            return false;
+        }
+        return recent.avgLowPrice() < hour.avgLowPrice() * (1.0 - DOWNTREND_DROP);
     }
 
     /**

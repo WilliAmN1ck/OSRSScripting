@@ -86,6 +86,18 @@ class WikiPriceClientTest {
     }
 
     @Test
+    void parsesFiveMinuteStats() throws IOException {
+        CountingFetcher fetcher = new CountingFetcher();
+        fetcher.bodies.put("base/5m",
+                "{\"data\":{\"4151\":{\"avgHighPrice\":2580,\"avgLowPrice\":2490,"
+                        + "\"highPriceVolume\":12,\"lowPriceVolume\":7}}}");
+        Map<Integer, MarketStat> five =
+                client(fetcher, new AdjustableClock(Instant.EPOCH)).fiveMinuteStats();
+
+        assertEquals(new MarketStat(2580, 2490, 12, 7), five.get(4151));
+    }
+
+    @Test
     void cachesWithinTtlAndRefetchesAfter() throws IOException {
         CountingFetcher fetcher = new CountingFetcher();
         fetcher.bodies.put("base/latest", "{\"data\":{\"2\":{\"high\":10,\"low\":9}}}");

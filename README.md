@@ -19,12 +19,14 @@ This software is provided for educational purposes only; use at your own risk.
   placement times, and profit persist across restarts in the script-settings
   directory; flipping pauses during client-scheduled breaks.
 
-  Candidates are scored from the trailing hour's **averaged** prices (so a single
-  outlier trade can't bait a bad item) and ranked by **estimated profit per hour**
+  Candidates are scored from **averaged** prices (so a single outlier trade can't
+  bait a bad item) — the fresher 5-minute averages when an item is actively trading
+  both sides, else the trailing hour's — and ranked by **estimated profit per hour**
   — net margin times the units the buy limit and **balanced** (lesser of buy/sell
   side) volume can sustain — tie-broken toward the offer that deploys more capital,
-  within per-item and total capital caps. Offers are still **placed at the live
-  price** so they fill at market. A **per-item trade history** auto-avoids recorded
+  within per-item and total capital caps. An item whose 5-minute price has dropped
+  sharply below the hour (a **falling knife**) is skipped for buying. Offers are
+  still **placed at the live price** so they fill at market. A **per-item trade history** auto-avoids recorded
   losers, and stale sells **escalate to the insta-sell price** after N relists.
   When GE slots or cash sit idle because of a config setting, the sidebar shows an
   **advisory naming the setting to adjust**.

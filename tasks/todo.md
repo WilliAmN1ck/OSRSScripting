@@ -137,4 +137,12 @@
       WikiPriceClientTest parses avg prices. Full suite + fatJar green. /code-review max: 0 findings.
 - [ ] Live soak: picks liquid/balanced/profitable items, deploys bankroll, no fill-rate regression.
 
+## Buy-side trend guard + 5m freshness — branch `buy-trend-guard` (2026-06-13)
+- spec + handoff in docs/plans/buy-trend-guard/. Two deferred buying improvements via a new /5m fetch.
+- [x] Downtrend guard: skip a buy when 5m avg low > 5% below the hour (falling knife). Internal threshold.
+- [x] 5m freshness: margin/ROI from 5m averages when both sides traded recently, else hourly. Liquidity stays on hourly.
+- [x] WikiPriceClient.fiveMinuteStats() (shared parseStats); FlipTask degrades to hourly if /5m fetch fails (never skips a tick).
+- [x] Tests: falling-knife skip, mild-dip no-trip, 5m-fresh margin, /5m parse, 5m-failure degradation. Suite + fatJar green. Reviewed (1 self-finding fixed).
+- [ ] Live soak: skips a clearly falling item, fills slots normally.
+
 ## Phase 4 — Publish / distribution  (later / optional)
