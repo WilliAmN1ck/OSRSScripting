@@ -257,9 +257,22 @@ public final class FlipperPanel extends JPanel {
         StringBuilder text = new StringBuilder();
         text.append("Runtime: ").append(formatRuntime(snapshot.runtime())).append('\n');
         text.append("Session profit: ").append(gp(snapshot.sessionProfit())).append('\n');
+        text.append("Profit/hr: ").append(gp(profitPerHour(snapshot))).append('\n');
         text.append("All-time profit: ").append(gp(snapshot.allTimeProfit())).append('\n');
+        int up = 0;
+        int down = 0;
+        for (StatsSnapshot.TradeRow row : snapshot.tradeRows()) {
+            if (row.netProfit() > 0) {
+                up++;
+            } else if (row.netProfit() < 0) {
+                down++;
+            }
+        }
         text.append("Flips completed: ").append(snapshot.flipsCompleted()).append('\n');
+        text.append("Items: ").append(up).append(" up / ").append(down).append(" down\n");
+        text.append("Avoided (losses): ").append(snapshot.itemsAvoided()).append('\n');
         text.append("Cash: ").append(gp(snapshot.cash())).append('\n');
+        text.append("In buy offers: ").append(gp(snapshot.openBuyCapital())).append('\n');
         text.append("Offers:\n");
         for (String line : snapshot.offerLines()) {
             text.append("  ").append(line).append('\n');
@@ -313,6 +326,12 @@ public final class FlipperPanel extends JPanel {
             }
         }
         return s;
+    }
+
+    /** Realized session profit projected to an hourly rate; zero until the clock has advanced. */
+    private static long profitPerHour(StatsSnapshot snapshot) {
+        long seconds = snapshot.runtime().getSeconds();
+        return seconds > 0 ? snapshot.sessionProfit() * 3600L / seconds : 0L;
     }
 
     private static String formatRuntime(Duration runtime) {

@@ -152,5 +152,20 @@
 - [x] Tests: bid-up test (live low + 5%); recomputed tie-break (76x300 == 228x100) + placement +
       FlipTask buy values [100,105,9]. Suite + fatJar green. Reviewed (0 findings).
 - [ ] Live soak: buys fill faster without a noticeable margin hit (BID_FRACTION is the dial).
+## Live performance stats — branch `live-stats` (2026-06-13)
+- handoff in docs/plans/live-stats/. Observability for the live run (user picked this + win/loss).
+- [x] StatsSnapshot: openBuyCapital + itemsAvoided fields. GeFlipperScript.refreshStats computes
+      deployed capital (open buys) + avoided count (history.shouldAvoid w/ config threshold).
+- [x] FlipperPanel: Profit/hr (session profit / runtime), Items U up / D down, Avoided (losses),
+      In buy offers. profit/hr + win/loss derived in-panel (no extra snapshot fields).
+- [x] Tests: panel asserts profit/hr 313, 1 up/1 down, avoided 1, 1.8M deployed. Suite + fatJar green.
+## Sell-side crash exit — branch `sell-crash-exit` (2026-06-13)
+- handoff in docs/plans/sell-crash-exit/. Mirror of the buy guard for held positions.
+- [x] MarketTrend (core): shared falling-knife rule + DEFAULT_DROP 5%. FlipScanner uses it (private copy removed).
+- [x] FlipEngine.plan(... crashingItems) overload (others delegate w/ emptySet); sellPrice exits at
+      low on relist threshold OR crash. FlipTask computes crashing held-stock set from 5m/1h.
+- [x] Tests: MarketTrendTest; engine crash-exit (relists 0); FlipTask end-to-end dump-at-low. No
+      regression on relist escalation. Suite + fatJar green. Reviewed (0 findings).
+- [ ] Live soak: a held item in a real crash is dumped at the low.
 
 ## Phase 4 — Publish / distribution  (later / optional)

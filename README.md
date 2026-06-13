@@ -15,7 +15,8 @@ This software is provided for educational purposes only; use at your own risk.
   humanization). Fully unit-tested without a game client.
 - `scripts/ge-flipper` — Grand Exchange flipper (SDK-coupled). A `TaskRunner`
   loop drives the core flip engine against the live client; a Swing sidebar tab
-  edits the run config and shows live stats; buy-limit/stock ledgers, offer
+  edits the run config and shows live stats (profit/hr, capital deployed in open
+  buys, win/loss counts, items avoided); buy-limit/stock ledgers, offer
   placement times, and profit persist across restarts in the script-settings
   directory; flipping pauses during client-scheduled breaks.
 
@@ -32,6 +33,13 @@ This software is provided for educational purposes only; use at your own risk.
   price** after N relists.
   When GE slots or cash sit idle because of a config setting, the sidebar shows an
   **advisory naming the setting to adjust**.
+  sharply below the hour (a **falling knife**) is skipped for buying — and a held
+  item caught in the same crash is **dumped at the insta-sell price** rather than
+  held for the high. Offers are still **placed at the live price** so they fill at
+  market. A **per-item trade history** auto-avoids recorded losers, and stale sells
+  **escalate to the insta-sell price** after N relists. When GE slots or cash sit
+  idle because of a config setting, the sidebar shows an **advisory naming the
+  setting to adjust**.
 
 ## Build
 

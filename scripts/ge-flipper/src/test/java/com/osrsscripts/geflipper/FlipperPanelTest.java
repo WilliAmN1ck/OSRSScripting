@@ -128,17 +128,22 @@ class FlipperPanelTest {
         FlipperPanel panel = new FlipperPanel(initial(), config -> { }, () -> { });
 
         panel.update(new StatsSnapshot(Duration.ofMinutes(90), 470L, 12_470L, 3L, 250_000L,
+                1_800_000L,
                 List.of("1 BUY Test item 4/10 @ 100"),
                 List.of(new StatsSnapshot.TradeRow("Raw pike", 12L, 1, 2),
                         new StatsSnapshot.TradeRow("Gold bar", -300L, 2, 6)),
-                IdleReason.NONE));
+                1, IdleReason.NONE));
         // update marshals onto the EDT; wait for it to drain before asserting.
         SwingUtilities.invokeAndWait(() -> { });
 
         assertTrue(panel.statsText().contains("01:30:00"), "runtime shown");
         assertTrue(panel.statsText().contains("470"), "session profit shown");
+        assertTrue(panel.statsText().contains("313"), "profit/hr (470 over 90 min) shown");
         assertTrue(panel.statsText().contains("12,470"), "all-time profit shown");
+        assertTrue(panel.statsText().contains("1 up / 1 down"), "win/loss counts shown");
+        assertTrue(panel.statsText().contains("Avoided (losses): 1"), "avoided count shown");
         assertTrue(panel.statsText().contains("250,000"), "cash shown");
+        assertTrue(panel.statsText().contains("1,800,000"), "capital in buy offers shown");
         assertTrue(panel.statsText().contains("Test item"), "offer line shown");
         assertEquals(2, panel.historyRowCount(), "trade history table populated");
         assertEquals(" ", panel.advisoryText(), "no advisory when nothing is wasted");
@@ -149,8 +154,8 @@ class FlipperPanelTest {
             InvocationTargetException {
         FlipperPanel panel = new FlipperPanel(initial(), config -> { }, () -> { });
 
-        panel.update(new StatsSnapshot(Duration.ZERO, 0L, 0L, 0L, 0L, List.of(), List.of(),
-                IdleReason.MAX_SLOTS));
+        panel.update(new StatsSnapshot(Duration.ZERO, 0L, 0L, 0L, 0L, 0L, List.of(), List.of(),
+                0, IdleReason.MAX_SLOTS));
         SwingUtilities.invokeAndWait(() -> { });
 
         assertTrue(panel.advisoryText().contains("Max GE slots"),
