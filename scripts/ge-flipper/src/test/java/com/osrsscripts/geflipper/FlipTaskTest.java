@@ -333,6 +333,34 @@ class FlipTaskTest {
     }
 
     @Test
+    void aCrashingHeldItemIsDumpedAtTheInstaSellPrice() {
+        // Sell-exit-after-relists is off, so only a real-time crash can drop the listing to the low.
+        config.set(FlipConfig.builder()
+                .capitalCap(0L).perItemCapitalCap(1_000_000L)
+                .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
+                .maxSlots(8).maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30)).build());
+        client.open = true;
+        client.coins = 0L;
+        stock.recordBuy(100, 3, 150L);
+        client.stock.put(100, 3);
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        CannedFetcher canned = new CannedFetcher();
+        task(url -> {
+            if (url.endsWith("/5m")) {
+                // Item 100's 5m sell-side (90) is ~10% below its hour average (100): a falling knife.
+                return "{\"data\":{\"100\":{\"avgHighPrice\":180,\"avgLowPrice\":90,"
+                        + "\"highPriceVolume\":50,\"lowPriceVolume\":50}}}";
+            }
+            return canned.get(url);
+        }).execute();
+
+        assertEquals(1, client.sells.size());
+        assertArrayEquals(new int[] {100, 100, 3}, client.sells.get(0)); // low 100, not high 200
+    }
+
+    @Test
     void recordedLosersAreAvoidedUntilHistoryIsCleared() {
         config.set(FlipConfig.builder()
                 .capitalCap(1_000_000L).perItemCapitalCap(1_000_000L)

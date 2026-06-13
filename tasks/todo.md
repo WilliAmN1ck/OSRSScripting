@@ -145,4 +145,13 @@
 - [x] Tests: falling-knife skip, mild-dip no-trip, 5m-fresh margin, /5m parse, 5m-failure degradation. Suite + fatJar green. Reviewed (1 self-finding fixed).
 - [ ] Live soak: skips a clearly falling item, fills slots normally.
 
+## Sell-side crash exit — branch `sell-crash-exit` (2026-06-13)
+- handoff in docs/plans/sell-crash-exit/. Mirror of the buy guard for held positions.
+- [x] MarketTrend (core): shared falling-knife rule + DEFAULT_DROP 5%. FlipScanner uses it (private copy removed).
+- [x] FlipEngine.plan(... crashingItems) overload (others delegate w/ emptySet); sellPrice exits at
+      low on relist threshold OR crash. FlipTask computes crashing held-stock set from 5m/1h.
+- [x] Tests: MarketTrendTest; engine crash-exit (relists 0); FlipTask end-to-end dump-at-low. No
+      regression on relist escalation. Suite + fatJar green. Reviewed (0 findings).
+- [ ] Live soak: a held item in a real crash is dumped at the low.
+
 ## Phase 4 — Publish / distribution  (later / optional)

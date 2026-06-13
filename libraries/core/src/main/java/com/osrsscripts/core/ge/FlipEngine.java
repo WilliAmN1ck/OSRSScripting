@@ -64,11 +64,7 @@ public final class FlipEngine {
         return plan(rankedCandidates, prices, account, ledger, config, now, Collections.emptyMap());
     }
 
-    /**
-     * The full decision for one tick: the actions to perform plus the reason any GE slots were left
-     * idle, so the caller can prompt the user when a config setting — not the market or the
-     * account's gold — is what is keeping slots and capital unused.
-     */
+    /** As the full {@code plan}, with no items flagged as crashing. */
     public FlipPlan plan(List<FlipCandidate> rankedCandidates,
                          Map<Integer, PricePoint> prices,
                          AccountState account,
@@ -76,6 +72,25 @@ public final class FlipEngine {
                          FlipConfig config,
                          Instant now,
                          Map<Integer, Integer> sellRelistCounts) {
+        return plan(rankedCandidates, prices, account, ledger, config, now, sellRelistCounts,
+                Collections.emptySet());
+    }
+
+    /**
+     * The full decision for one tick: the actions to perform plus the reason any GE slots were left
+     * idle, so the caller can prompt the user when a config setting — not the market or the
+     * account's gold — is what is keeping slots and capital unused. Items in {@code crashingItems}
+     * are exited at the insta-sell price rather than listed for the high, to dump a held position
+     * whose value is dropping in real time.
+     */
+    public FlipPlan plan(List<FlipCandidate> rankedCandidates,
+                         Map<Integer, PricePoint> prices,
+                         AccountState account,
+                         BuyLimitLedger ledger,
+                         FlipConfig config,
+                         Instant now,
+                         Map<Integer, Integer> sellRelistCounts,
+                         Set<Integer> crashingItems) {
         List<FlipAction> actions = new ArrayList<>();
         Deque<Integer> freeSlots = new ArrayDeque<>();
         Set<Integer> busyItems = new HashSet<>();
@@ -127,7 +142,7 @@ public final class FlipEngine {
             }
             int slot = freeSlots.poll();
             actions.add(FlipAction.placeSell(slot, itemId, sellPrice(price, itemId, config,
-                    sellRelistCounts), qty));
+                    sellRelistCounts, crashingItems), qty));
             busyItems.add(itemId);
             capacity--;
         }
@@ -216,15 +231,18 @@ public final class FlipEngine {
     }
 
     /**
-     * The price to list a sell at: the insta-buy (high) price normally, dropping to the
-     * insta-sell (low) price once the item has been relisted stale too many times — taking the
-     * exit beats parking capital forever.
+     * The price to list a sell at: the insta-buy (high) price normally, dropping to the insta-sell
+     * (low) price to take the exit when either the item has been relisted stale too many times
+     * (parking capital forever beats nothing) or its price is crashing in real time (dump the
+     * position before it drops further).
      */
     private static long sellPrice(PricePoint price, int itemId, FlipConfig config,
-                                  Map<Integer, Integer> sellRelistCounts) {
+                                  Map<Integer, Integer> sellRelistCounts,
+                                  Set<Integer> crashingItems) {
         int threshold = config.sellExitAfterRelists();
-        if (threshold > 0 && price.hasLow()
-                && sellRelistCounts.getOrDefault(itemId, 0) >= threshold) {
+        boolean relistExit = threshold > 0 && sellRelistCounts.getOrDefault(itemId, 0) >= threshold;
+        boolean crashExit = crashingItems.contains(itemId);
+        if ((relistExit || crashExit) && price.hasLow()) {
             return price.low();
         }
         return price.high();
