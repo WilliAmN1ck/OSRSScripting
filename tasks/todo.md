@@ -87,4 +87,19 @@
 - [x] README: added capital ranking, trade history/auto-avoid, sell-exit, idle advisory
 - [x] Created docs/lessons.md seeded with this session's corrections
 
+## Antiban upgrade (Moderate) — branch `antiban-upgrade` (2026-06-13)
+- spec + plan approved (docs/plans/antiban-upgrade/); breaks already set up by user
+- [x] Phase A — core schedulers (TDD): FidgetType + FidgetSelector (weighted, no-repeat),
+      FatigueScaler (delay multiplier ramps over session), AfkScheduler (20-90s look-aways,
+      a few/hour, min gap). All green.
+- [x] Phase B — SdkFidget.run(FidgetType): camera/tab-glance-return/mouse-drift (drift via SDK).
+      HumanizedIdle uses selector + fatigue. Deviation: SDK has no world-map/no-click-hover →
+      dropped WORLD_MAP/HOVER (3 fidgets, up from 2).
+- [x] Phase C — cadence (1.5-3.5s x fatigue) + AFK poll in loop; reaction beat in executor (C2).
+      C3 active-flip fidget DEFERRED (idle path already covers the waits; GE-open fidget risk →
+      validate fidgets live first).
+- [x] Phase D — /code-review max (0 findings); handoff written; PR. Live fidget/AFK soak still
+      pending a clean flipping window (driven attempt hit a scheduled ~47-min Echo break, which
+      incidentally confirmed break-shadowing works — flipper stayed idle while logged out).
+
 ## Phase 4 — Publish / distribution  (later / optional)

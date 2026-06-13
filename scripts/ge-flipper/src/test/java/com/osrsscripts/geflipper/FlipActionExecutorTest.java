@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.osrsscripts.core.ge.FlipAction;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class FlipActionExecutorTest {
@@ -76,6 +77,18 @@ class FlipActionExecutorTest {
 
         client.collectsSucceed = true;
         assertTrue(executor.execute(List.of(FlipAction.cancel(2), FlipAction.collect(1))));
+    }
+
+    @Test
+    void reactionBeatRunsOncePerNonEmptyBatchOnly() {
+        AtomicInteger beats = new AtomicInteger();
+        FlipActionExecutor withBeat = new FlipActionExecutor(client, beats::incrementAndGet);
+
+        withBeat.execute(List.of());
+        assertEquals(0, beats.get(), "no beat for an empty batch");
+
+        withBeat.execute(List.of(FlipAction.placeBuy(0, 1234, 100L, 7)));
+        assertEquals(1, beats.get(), "one beat before acting on a batch");
     }
 
     @Test

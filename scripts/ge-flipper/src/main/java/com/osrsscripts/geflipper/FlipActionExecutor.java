@@ -18,9 +18,19 @@ import java.util.Objects;
 public final class FlipActionExecutor {
 
     private final GeClient client;
+    private final Runnable reactionBeat;
 
     public FlipActionExecutor(GeClient client) {
+        this(client, () -> { });
+    }
+
+    /**
+     * As {@link #FlipActionExecutor(GeClient)}, with a {@code reactionBeat} run once before a
+     * non-empty batch of actions — a short human pause before reacting to the offers.
+     */
+    public FlipActionExecutor(GeClient client, Runnable reactionBeat) {
         this.client = Objects.requireNonNull(client, "client");
+        this.reactionBeat = Objects.requireNonNull(reactionBeat, "reactionBeat");
     }
 
     /**
@@ -30,6 +40,9 @@ public final class FlipActionExecutor {
      * leave the offer-setup screen wedged.
      */
     public boolean execute(List<FlipAction> actions) {
+        if (!actions.isEmpty()) {
+            reactionBeat.run(); // pause a beat before reacting, like a person noticing the offers
+        }
         boolean collected = false;
         boolean actionsOk = true;
         for (FlipAction action : actions) {
