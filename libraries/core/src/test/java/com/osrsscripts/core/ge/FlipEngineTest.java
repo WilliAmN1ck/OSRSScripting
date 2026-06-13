@@ -152,13 +152,37 @@ class FlipEngineTest {
                 .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8)
                 .minMarginGp(1).minDeploymentGp(1_000L)
                 .build();
-        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 22, 30, 10_000));
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 22, 30, 100_000));
 
         List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
                 new BuyLimitLedger(), config, now);
 
-        // 50_000 / 22 = 2272 units, 49_984 gp deployed: well above the floor.
+        // The whole budget deploys into one offer: 50_000 / 22 = 2272 units, clearing the floor.
         assertEquals(Collections.singletonList(FlipAction.placeBuy(0, 100, 22, 2272)), actions);
+    }
+
+    @Test
+    void neverBuysAnItemItHoldsOrIsSelling() {
+        // Holding the item as stock: no buy, even with slots and budget free.
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(100, new PricePoint(15, now, 10, now));
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(100, 5);
+        AccountState holding = new AccountState(10_000L, emptySlots(8), stock);
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 10, 15, 10_000));
+
+        List<FlipAction> actions = engine.decide(ranked, prices, holding,
+                new BuyLimitLedger(), config(), now);
+        assertTrue(actions.stream().noneMatch(a -> a.type() == ActionType.PLACE_BUY),
+                "buying what we hold risks matching our own sell");
+
+        // A live sell for the item: same rule.
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.SELL, 100, 15, 5, 0, now));
+        AccountState selling = new AccountState(10_000L, offers, Collections.emptyMap());
+        List<FlipAction> sellingActions = engine.decide(ranked, Collections.emptyMap(), selling,
+                new BuyLimitLedger(), config(), now);
+        assertTrue(sellingActions.isEmpty());
     }
 
     @Test
@@ -246,6 +270,85 @@ class FlipEngineTest {
     }
 
     @Test
+    void planReportsMaxSlotsWhenConcurrencyCapStrandsOpenSlots() {
+        // Three live buys fill maxSlots; five GE slots sit open with gold and a candidate to spare.
+        List<GeOffer> offers = emptySlots(8);
+        for (int i = 0; i < 3; i++) {
+            offers.set(i, new GeOffer(i, OfferStatus.ACTIVE, OfferSide.BUY, 500 + i, 100, 1, 0, now));
+        }
+        AccountState account = new AccountState(1_000_000L, offers, Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(3).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 1000));
+
+        FlipPlan plan = engine.plan(ranked, Collections.emptyMap(), account, new BuyLimitLedger(),
+                config, now);
+
+        assertEquals(IdleReason.MAX_SLOTS, plan.idleReason());
+    }
+
+    @Test
+    void planReportsNoCandidatesWhenFiltersStarveTheEngine() {
+        AccountState account = new AccountState(1_000_000L, emptySlots(8), Collections.emptyMap());
+
+        FlipPlan plan = engine.plan(Collections.emptyList(), Collections.emptyMap(), account,
+                new BuyLimitLedger(), config(), now);
+
+        assertEquals(IdleReason.NO_CANDIDATES, plan.idleReason());
+    }
+
+    @Test
+    void planReportsCapitalCapWhenItIsFullyCommitted() {
+        // A single live buy commits the whole cap; free slots remain but no budget to use them.
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 200, 3000, 200, 0, now));
+        AccountState account = new AccountState(1_000_000L, offers, Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(600_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 1000));
+
+        FlipPlan plan = engine.plan(ranked, Collections.emptyMap(), account, new BuyLimitLedger(),
+                config, now);
+
+        assertEquals(IdleReason.CAPITAL_CAP, plan.idleReason());
+    }
+
+    @Test
+    void planReportsPerItemCapWhenSlotsAreFullButCashSitsIdle() {
+        // The one open slot fills, but the per-item cap sizes the offer to 5 units (5_000 gp),
+        // leaving most of the budget undeployed with no slot left to use it.
+        AccountState account = new AccountState(1_000_000L, emptySlots(1), Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(5_000L).maxSlots(1).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 10_000));
+
+        FlipPlan plan = engine.plan(ranked, Collections.emptyMap(), account, new BuyLimitLedger(),
+                config, now);
+
+        assertEquals(IdleReason.PER_ITEM_CAP, plan.idleReason());
+    }
+
+    @Test
+    void planReportsNoneWhenAllCashIsDeployed() {
+        AccountState account = new AccountState(8_000L, emptySlots(4), Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(4).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = List.of(candidate(100, 10, 15, 10_000));
+
+        FlipPlan plan = engine.plan(ranked, Collections.emptyMap(), account, new BuyLimitLedger(),
+                config, now);
+
+        // The whole budget goes into one offer; remaining idle slots are out-of-gold, not config.
+        assertEquals(IdleReason.NONE, plan.idleReason());
+        assertEquals(Collections.singletonList(FlipAction.placeBuy(0, 100, 10, 800)),
+                plan.actions());
+    }
+
+    @Test
     void totalCapitalCapLimitsNewBuyQuantity() {
         List<GeOffer> offers = emptySlots(8);
         offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 200, 1000, 500, 0, now));
@@ -258,6 +361,7 @@ class FlipEngineTest {
         List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
                 new BuyLimitLedger(), config, now);
 
+        // 500k already committed of the 600k cap: exactly 100 more units at 1000 gp, in one offer.
         assertEquals(Collections.singletonList(FlipAction.placeBuy(1, 100, 1000, 100)), actions);
     }
 }

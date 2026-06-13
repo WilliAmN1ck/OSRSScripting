@@ -4,8 +4,10 @@ import com.osrsscripts.core.ge.ActionType;
 import com.osrsscripts.core.ge.BuyLimitLedger;
 import com.osrsscripts.core.ge.FlipAction;
 import com.osrsscripts.core.ge.FlipEngine;
+import com.osrsscripts.core.ge.FlipPlan;
 import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
+import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.ge.TradeHistory;
@@ -69,6 +71,8 @@ public final class FlipTask implements Task {
     private final Map<Integer, Integer> sellRelists = new HashMap<>();
     private Instant retryAfter = Instant.MIN;
     private int idleTicks;
+    /** Why slots sat idle on the last evaluated tick, exposed to the stats refresh for the sidebar. */
+    private volatile IdleReason idleReason = IdleReason.NONE;
 
     public FlipTask(GeClient client, WikiPriceClient prices, FlipScanner scanner, FlipEngine engine,
                     GeTax tax, BuyLimitLedger ledger, StockLedger stock, OfferTracker tracker,
@@ -96,6 +100,11 @@ public final class FlipTask implements Task {
     @Override
     public boolean shouldRun() {
         return true;
+    }
+
+    /** Why slots sat idle on the last evaluated tick, for the sidebar to surface to the user. */
+    public IdleReason idleReason() {
+        return idleReason;
     }
 
     @Override
@@ -138,8 +147,10 @@ public final class FlipTask implements Task {
         // History has the final word: items that keep losing money stop being candidates.
         candidates.removeIf(
                 c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
-        List<FlipAction> actions =
-                engine.decide(candidates, latest, account, ledger, currentConfig, now, sellRelists);
+        FlipPlan plan =
+                engine.plan(candidates, latest, account, ledger, currentConfig, now, sellRelists);
+        idleReason = plan.idleReason();
+        List<FlipAction> actions = plan.actions();
         if (actions.isEmpty()) {
             // Nothing to do (e.g. every slot committed): after a short grace period close the
             // GE — a human doesn't stare at a static interface — and fidget occasionally.

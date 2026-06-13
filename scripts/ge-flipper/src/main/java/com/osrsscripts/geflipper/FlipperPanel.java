@@ -1,5 +1,6 @@
 package com.osrsscripts.geflipper;
 
+import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.model.FlipConfig;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -35,11 +36,11 @@ public final class FlipperPanel extends JPanel {
     /** The editable config fields, in display order. */
     public enum Field {
         CAPITAL_CAP("Capital cap (gp)"),
-        PER_ITEM_CAPITAL_CAP("Per-item capital cap (gp)"),
+        PER_ITEM_CAPITAL_CAP("Max spend per item (gp)"),
         MIN_MARGIN_GP("Min margin (gp)"),
-        MIN_MARGIN_PCT("Min margin (fraction)"),
-        MIN_VOLUME("Min volume (units/h)"),
-        MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
+        MIN_MARGIN_PCT("Min ROI (%)"),
+        MIN_VOLUME("Min hourly volume (units)"),
+        MIN_DEPLOYMENT_GP("Min spend per buy (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
         MAX_OFFER_AGE_MINUTES("Max offer age (minutes)"),
         SELL_EXIT_AFTER_RELISTS("Insta-sell after relists (0=off)"),
@@ -60,6 +61,7 @@ public final class FlipperPanel extends JPanel {
     private final JButton clearHistoryButton = new JButton("Clear history");
     private final JLabel errorLabel = new JLabel(" ");
     private final JTextArea statsArea = new JTextArea(8, 24);
+    private final JLabel advisoryLabel = new JLabel(" ");
     private final DefaultTableModel historyModel = new DefaultTableModel(HISTORY_COLUMNS, 0) {
         @Override
         public boolean isCellEditable(int row, int column) {
@@ -86,18 +88,21 @@ public final class FlipperPanel extends JPanel {
         c.insets = new Insets(2, 4, 2, 4);
         c.fill = GridBagConstraints.HORIZONTAL;
 
+        // The RuneLite sidebar is a fixed, narrow column, so label-beside-field squeezes the input
+        // to an unreadable sliver. Stack the label above a full-width field so the typed numbers
+        // are always visible.
         int row = 0;
         for (Field field : Field.values()) {
             JTextField input = new JTextField(initialValue(field, initial), 10);
             fields.put(field, input);
             c.gridx = 0;
             c.gridy = row;
-            c.weightx = 0;
-            section.add(new JLabel(field.label), c);
-            c.gridx = 1;
+            c.gridwidth = 2;
             c.weightx = 1;
+            section.add(new JLabel(field.label), c);
+            c.gridy = row + 1;
             section.add(input, c);
-            row++;
+            row += 2;
         }
         c.gridx = 0;
         c.gridy = row;
@@ -119,6 +124,9 @@ public final class FlipperPanel extends JPanel {
         statsArea.setEditable(false);
         statsArea.setOpaque(false);
         stats.add(statsArea, BorderLayout.CENTER);
+        // Amber advisory shown only when a config setting is keeping GE slots or gold idle.
+        advisoryLabel.setForeground(new Color(0xB36B00));
+        stats.add(advisoryLabel, BorderLayout.SOUTH);
 
         JPanel history = new JPanel(new BorderLayout(0, 4));
         history.setBorder(BorderFactory.createTitledBorder("Trade history"));
@@ -142,7 +150,8 @@ public final class FlipperPanel extends JPanel {
             case MIN_MARGIN_GP:
                 return Long.toString(config.minMarginGp());
             case MIN_MARGIN_PCT:
-                return Double.toString(config.minMarginPct());
+                // Stored as a fraction (0.02), shown and entered as a percent (2).
+                return trimNumber(config.minMarginPct() * 100.0);
             case MIN_VOLUME:
                 return Long.toString(config.minVolume());
             case MIN_DEPLOYMENT_GP:
@@ -184,7 +193,7 @@ public final class FlipperPanel extends JPanel {
                 .capitalCap(parseLong(Field.CAPITAL_CAP, 0))
                 .perItemCapitalCap(parseLong(Field.PER_ITEM_CAPITAL_CAP, 0))
                 .minMarginGp(parseLong(Field.MIN_MARGIN_GP, 0))
-                .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT))
+                .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT) / 100.0)
                 .minVolume(parseLong(Field.MIN_VOLUME, 0))
                 .minDeploymentGp(parseLong(Field.MIN_DEPLOYMENT_GP, 0))
                 .maxSlots(maxSlots)
@@ -236,14 +245,55 @@ public final class FlipperPanel extends JPanel {
         for (String line : snapshot.offerLines()) {
             text.append("  ").append(line).append('\n');
         }
+        String advisory = advisory(snapshot.idleReason());
         SwingUtilities.invokeLater(() -> {
             statsArea.setText(text.toString());
+            // Wrap in HTML so the sidebar's narrow column flows the advisory onto several lines
+            // instead of clipping it to an unreadable "lower 'Min …".
+            advisoryLabel.setText(advisory.isEmpty() ? " " : "<html>" + advisory + "</html>");
             historyModel.setRowCount(0);
             for (StatsSnapshot.TradeRow row : snapshot.tradeRows()) {
                 historyModel.addRow(new Object[] {row.itemName(), gp(row.netProfit()),
                         row.flipsCompleted(), row.qtySold()});
             }
         });
+    }
+
+    /**
+     * The advisory to show when a config setting is leaving GE slots or gold idle: which setting,
+     * and which way to move it. Empty when nothing is being wasted (or the cause is the market or
+     * an empty wallet, neither of which a setting can fix).
+     */
+    private static String advisory(IdleReason reason) {
+        switch (reason) {
+            case MAX_SLOTS:
+                return "GE slots sit idle — raise \"" + Field.MAX_SLOTS.label
+                        + "\" to use them.";
+            case CAPITAL_CAP:
+                return "Capital cap reached — raise \"" + Field.CAPITAL_CAP.label
+                        + "\" to deploy more gold.";
+            case PER_ITEM_CAP:
+                return "Per-item cap is limiting buys — raise \"" + Field.PER_ITEM_CAPITAL_CAP.label
+                        + "\" or loosen filters for more items.";
+            case NO_CANDIDATES:
+                return "No items pass your filters — lower \"" + Field.MIN_MARGIN_GP.label
+                        + "\" or \"" + Field.MIN_VOLUME.label + "\".";
+            case NONE:
+            default:
+                return "";
+        }
+    }
+
+    /** Formats a double for a text field: US decimal point, no float noise or trailing zeros. */
+    private static String trimNumber(double value) {
+        String s = String.format(Locale.US, "%.4f", value);
+        if (s.contains(".")) {
+            s = s.replaceAll("0+$", "");
+            if (s.endsWith(".")) {
+                s = s.substring(0, s.length() - 1);
+            }
+        }
+        return s;
     }
 
     private static String formatRuntime(Duration runtime) {
@@ -284,5 +334,9 @@ public final class FlipperPanel extends JPanel {
 
     String statsText() {
         return statsArea.getText();
+    }
+
+    String advisoryText() {
+        return advisoryLabel.getText();
     }
 }
