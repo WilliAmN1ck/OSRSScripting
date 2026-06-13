@@ -10,6 +10,8 @@ import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.humanize.DelayDistribution;
+import com.osrsscripts.core.humanize.FatigueScaler;
+import com.osrsscripts.core.humanize.FidgetSelector;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.ItemMeta;
@@ -55,6 +57,8 @@ public final class GeFlipperScript implements TribotScript {
     private static final Duration PLACEMENT_RETRY_BACKOFF = Duration.ofSeconds(10);
     private static final long FIDGET_MIN_MS = 15_000L;
     private static final long FIDGET_MAX_MS = 45_000L;
+    private static final Duration FATIGUE_RAMP = Duration.ofHours(3);
+    private static final double FATIGUE_MAX = 1.6;
 
     @Override
     public void execute(ScriptContext context) {
@@ -93,9 +97,12 @@ public final class GeFlipperScript implements TribotScript {
         // Echo's built-in action humanization, plus our own idle fidgets while slots sit full.
         Antiban.setScriptAiAntibanEnabled(true);
         Random random = new Random();
-        IdleBehavior idle = new HumanizedIdle(
+        Instant startedAt = Instant.now();
+        FatigueScaler fatigue = new FatigueScaler(startedAt, FATIGUE_RAMP, FATIGUE_MAX);
+        SdkFidget fidget = new SdkFidget(context, random);
+        HumanizedIdle idle = new HumanizedIdle(
                 new DelayDistribution(FIDGET_MIN_MS, FIDGET_MAX_MS, random),
-                new SdkFidget(context, random));
+                new FidgetSelector(random), fatigue, fidget::run);
 
         FlipTask flipTask = new FlipTask(client, prices, scanner, engine, tax, ledger, stock,
                 tracker, history, config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle,
@@ -105,7 +112,6 @@ public final class GeFlipperScript implements TribotScript {
                 flipTask);
         TaskRunner runner = new TaskRunner(tasks);
 
-        Instant startedAt = Instant.now();
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 runner.tick();

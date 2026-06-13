@@ -13,12 +13,6 @@ public enum FidgetType {
     /** Glance at a harmless side tab, then return to a home tab. */
     TAB_GLANCE,
 
-    /** Drift the mouse idly toward a screen edge. */
-    MOUSE_DRIFT,
-
-    /** Briefly open the world map, then close it. */
-    WORLD_MAP,
-
-    /** Hover (without clicking) over a GE slot or inventory item. */
-    HOVER
+    /** Drift the mouse idly within the game canvas. */
+    MOUSE_DRIFT
 }

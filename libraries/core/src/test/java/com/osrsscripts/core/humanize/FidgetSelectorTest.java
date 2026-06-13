@@ -37,12 +37,10 @@ class FidgetSelectorTest {
         Map<FidgetType, Integer> weights = new EnumMap<>(FidgetType.class);
         weights.put(FidgetType.CAMERA, 1);
         weights.put(FidgetType.TAB_GLANCE, 1);
-        weights.put(FidgetType.MOUSE_DRIFT, 1);
-        weights.put(FidgetType.HOVER, 1);
-        weights.put(FidgetType.WORLD_MAP, 0);
+        weights.put(FidgetType.MOUSE_DRIFT, 0);
         FidgetSelector selector = new FidgetSelector(new Random(1), weights);
         for (int i = 0; i < 2000; i++) {
-            assertNotEquals(FidgetType.WORLD_MAP, selector.next());
+            assertNotEquals(FidgetType.MOUSE_DRIFT, selector.next());
         }
     }
 

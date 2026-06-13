@@ -24,11 +24,13 @@ actions in the script (verified in the live soak, not unit-tested). Nothing may 
 
 ## Phase B — SDK fidget actions (script, live-verified)
 
-- **B1 Extend `SdkFidget` to execute a `FidgetType`.** Replace the internal 50/50 with a
-  `run(FidgetType)` that maps each type to a **side-effect-free** SDK action: camera drift *(have)*,
-  tab-glance-then-return-home *(enhance)*, mouse idle-drift toward an edge *(new, via `context.mouse`)*,
-  world-map open-then-close *(new)*, no-click hover over a GE slot / inventory item *(new)*. Every
-  action wrapped so a failure is swallowed.
+- **B1 Extend `SdkFidget` to execute a `FidgetType`.** `run(FidgetType)` maps each type to a
+  **side-effect-free** SDK action: camera drift *(have)*, tab-glance-then-return-home *(enhance)*,
+  mouse idle-drift via `context.getMouse().drift(Rectangle, long)` over the canvas *(new)*. Every
+  action wrapped so a failure is swallowed (logged, never rethrown).
+  **Deviation:** the SDK exposes no world-map accessor and no no-click item-hover, so `WORLD_MAP`
+  and `HOVER` were dropped from `FidgetType` — the repertoire is the three above (still up from the
+  original two).
   *Verify:* live soak (no unit test — SDK-coupled).
 - **B2 `HumanizedIdle` uses the selector + fatigue.** Pull the next `FidgetType` from `FidgetSelector`
   and scale the inter-fidget delay by `FatigueScaler`. Expose `maybeFidgetNow(...)` so the active-flip

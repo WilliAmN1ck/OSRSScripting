@@ -71,10 +71,8 @@ public final class FidgetSelector {
     private static Map<FidgetType, Integer> defaultWeights() {
         Map<FidgetType, Integer> weights = new EnumMap<>(FidgetType.class);
         weights.put(FidgetType.CAMERA, 4);
-        weights.put(FidgetType.TAB_GLANCE, 4);
+        weights.put(FidgetType.TAB_GLANCE, 3);
         weights.put(FidgetType.MOUSE_DRIFT, 3);
-        weights.put(FidgetType.HOVER, 3);
-        weights.put(FidgetType.WORLD_MAP, 1);
         return weights;
     }
 }
