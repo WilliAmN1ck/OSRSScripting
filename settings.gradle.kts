@@ -23,3 +23,4 @@ rootProject.name = "osrs-scripts-suite"
 
 include("libraries:core")
 include("scripts:ge-flipper")
+include("scripts:account-builder")
