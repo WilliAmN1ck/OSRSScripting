@@ -208,6 +208,44 @@ class FlipEngineTest {
     }
 
     @Test
+    void repeatedlyStaleSellExitsAtTheInstaSellPrice() {
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(100, new PricePoint(1100, now, 1000, now)); // high 1100, low 1000
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(100, 50);
+        AccountState account = new AccountState(0L, emptySlots(8), stock);
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8)
+                .minMarginGp(1).sellExitAfterRelists(3)
+                .build();
+
+        // Two failed listings so far: still patient, list at the insta-buy (high) price.
+        List<FlipAction> patient = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config, now, Map.of(100, 2));
+        assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1100, 50)), patient);
+
+        // Third relist: exit at the insta-sell (low) price.
+        List<FlipAction> exiting = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config, now, Map.of(100, 3));
+        assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1000, 50)), exiting);
+    }
+
+    @Test
+    void sellExitDisabledKeepsListingAtMarket() {
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(100, new PricePoint(1100, now, 1000, now));
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(100, 50);
+        AccountState account = new AccountState(0L, emptySlots(8), stock);
+
+        // Default config: sellExitAfterRelists 0 = disabled, even with a huge relist count.
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config(), now, Map.of(100, 99));
+
+        assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1100, 50)), actions);
+    }
+
+    @Test
     void totalCapitalCapLimitsNewBuyQuantity() {
         List<GeOffer> offers = emptySlots(8);
         offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 200, 1000, 500, 0, now));

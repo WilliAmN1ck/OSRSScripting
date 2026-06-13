@@ -16,6 +16,7 @@ public final class FlipConfig {
     private final Duration maxOfferAge;
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
+    private final int sellExitAfterRelists;
 
     private FlipConfig(Builder b) {
         this.capitalCap = b.capitalCap;
@@ -27,6 +28,7 @@ public final class FlipConfig {
         this.maxOfferAge = b.maxOfferAge;
         this.membersItemsAllowed = b.membersItemsAllowed;
         this.minDeploymentGp = b.minDeploymentGp;
+        this.sellExitAfterRelists = b.sellExitAfterRelists;
     }
 
     /**
@@ -83,6 +85,14 @@ public final class FlipConfig {
         return minDeploymentGp;
     }
 
+    /**
+     * After this many stale relists of the same item's sell, the next listing goes at the
+     * insta-sell (low) price to exit the position. {@code 0} disables escalation.
+     */
+    public int sellExitAfterRelists() {
+        return sellExitAfterRelists;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -97,6 +107,7 @@ public final class FlipConfig {
         private Duration maxOfferAge = Duration.ofMinutes(30);
         private boolean membersItemsAllowed = true;
         private long minDeploymentGp = 0L;
+        private int sellExitAfterRelists = 0;
 
         /** Required for buying: leaving this at the default {@code 0} disables all buy offers. */
         public Builder capitalCap(long v) {
@@ -141,6 +152,11 @@ public final class FlipConfig {
 
         public Builder minDeploymentGp(long v) {
             this.minDeploymentGp = v;
+            return this;
+        }
+
+        public Builder sellExitAfterRelists(int v) {
+            this.sellExitAfterRelists = v;
             return this;
         }
 

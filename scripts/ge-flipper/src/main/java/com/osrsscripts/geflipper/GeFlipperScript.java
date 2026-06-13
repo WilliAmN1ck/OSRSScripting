@@ -149,6 +149,7 @@ public final class GeFlipperScript implements TribotScript {
                 .minDeploymentGp(1_000L)
                 .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
+                .sellExitAfterRelists(3)
                 .build();
     }
 }

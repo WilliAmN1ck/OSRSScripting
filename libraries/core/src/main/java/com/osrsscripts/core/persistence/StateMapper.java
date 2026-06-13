@@ -38,7 +38,8 @@ public final class StateMapper {
         PersistedConfig persistedConfig = new PersistedConfig(config.capitalCap(),
                 config.perItemCapitalCap(), config.minMarginGp(), config.minMarginPct(),
                 config.minVolume(), config.maxSlots(), config.maxOfferAge().toMinutes(),
-                config.membersItemsAllowed(), config.minDeploymentGp());
+                config.membersItemsAllowed(), config.minDeploymentGp(),
+                config.sellExitAfterRelists());
         return new PersistedState(ledgerEntries, stockEntries, stampEntries, persistedConfig,
                 tracker.realizedProfit(), tracker.flipsCompleted());
     }
@@ -59,6 +60,7 @@ public final class StateMapper {
                 .maxOfferAge(Duration.ofMinutes(c.maxOfferAgeMinutes()))
                 .membersItemsAllowed(c.membersItemsAllowed())
                 .minDeploymentGp(c.minDeploymentGp())
+                .sellExitAfterRelists(c.sellExitAfterRelists())
                 .build();
     }
 

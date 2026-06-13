@@ -38,7 +38,8 @@ public final class FlipperPanel extends JPanel {
         MIN_VOLUME("Min volume (units/h)"),
         MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
-        MAX_OFFER_AGE_MINUTES("Max offer age (minutes)");
+        MAX_OFFER_AGE_MINUTES("Max offer age (minutes)"),
+        SELL_EXIT_AFTER_RELISTS("Insta-sell after relists (0=off)");
 
         private final String label;
 
@@ -123,6 +124,8 @@ public final class FlipperPanel extends JPanel {
                 return Integer.toString(config.maxSlots());
             case MAX_OFFER_AGE_MINUTES:
                 return Long.toString(config.maxOfferAge().toMinutes());
+            case SELL_EXIT_AFTER_RELISTS:
+                return Integer.toString(config.sellExitAfterRelists());
             default:
                 throw new AssertionError(field);
         }
@@ -158,6 +161,8 @@ public final class FlipperPanel extends JPanel {
                 .maxSlots(maxSlots)
                 .maxOfferAge(Duration.ofMinutes(maxOfferAgeMinutes))
                 .membersItemsAllowed(membersCheckBox.isSelected())
+                .sellExitAfterRelists((int) Math.min(parseLong(Field.SELL_EXIT_AFTER_RELISTS, 0),
+                        Integer.MAX_VALUE))
                 .build();
     }
 

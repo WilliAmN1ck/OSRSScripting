@@ -276,18 +276,78 @@ class FlipTaskTest {
         assertEquals(1, client.buys.size());
     }
 
-    /** Serves the three wiki endpoints for a single profitable item (id 100, buy 100 / sell 200). */
+    @Test
+    void repeatedStaleSellsEscalateToTheInstaSellPrice() {
+        // Exit after a single stale relist, so the test needs one cancel.
+        config.set(FlipConfig.builder()
+                .capitalCap(0L).perItemCapitalCap(1_000_000L)
+                .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
+                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .sellExitAfterRelists(1).build());
+        client.open = true;
+        client.coins = 0L;
+        FlipTask task = task(new CannedFetcher());
+
+        // Tick 1: a live sell, placed an hour ago, goes stale and is cancelled.
+        GeOffer staleSell = new GeOffer(1, OfferStatus.ACTIVE, OfferSide.SELL, 100, 200L, 3, 0,
+                null);
+        tracker.restore(List.of(new OfferTracker.Stamp(1, 100, OfferSide.SELL, 200L, 0, 0L,
+                Instant.now().minus(Duration.ofHours(1)))), 0L, 0L);
+        client.offers = OfferMapper.fillEightSlots(List.of(staleSell));
+        task.execute();
+        assertEquals(List.of(1), client.aborts);
+
+        // Tick 2: items are back in the inventory; the relisting exits at the low price.
+        stock.recordBuy(100, 3, 150L);
+        client.stock.put(100, 3);
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        task.execute();
+
+        assertEquals(1, client.sells.size());
+        assertArrayEquals(new int[] {100, 100, 3}, client.sells.get(0)); // low = 100, not 200
+    }
+
+    @Test
+    void membersStockIsNeverOfferedWhenMembersItemsAreOff() {
+        config.set(FlipConfig.builder()
+                .capitalCap(0L).perItemCapitalCap(1_000_000L)
+                .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
+                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .membersItemsAllowed(false).build());
+        client.open = true;
+        client.coins = 0L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        stock.recordBuy(200, 5, 250L); // members item somehow in the ledger
+        client.stock.put(200, 5);
+
+        task(new CannedFetcher()).execute();
+        assertTrue(client.sells.isEmpty(), "an F2P world cannot sell members items");
+
+        // With members allowed the same stock sells normally.
+        config.set(buyingConfig());
+        task(new CannedFetcher()).execute();
+        assertEquals(1, client.sells.size());
+        assertArrayEquals(new int[] {200, 300, 5}, client.sells.get(0));
+    }
+
+    /**
+     * Serves the three wiki endpoints for two profitable items: id 100 (F2P, buy 100 / sell 200)
+     * and id 200 (members, buy 250 / sell 300).
+     */
     private static final class CannedFetcher implements HttpFetcher {
         @Override
         public String get(String url) {
             if (url.endsWith("/mapping")) {
-                return "[{\"id\":100,\"name\":\"Test item\",\"members\":false,\"limit\":1000}]";
+                return "[{\"id\":100,\"name\":\"Test item\",\"members\":false,\"limit\":1000},"
+                        + "{\"id\":200,\"name\":\"Members item\",\"members\":true,\"limit\":100}]";
             }
             if (url.endsWith("/latest")) {
-                return "{\"data\":{\"100\":{\"high\":200,\"highTime\":1,\"low\":100,\"lowTime\":1}}}";
+                return "{\"data\":{\"100\":{\"high\":200,\"highTime\":1,\"low\":100,\"lowTime\":1},"
+                        + "\"200\":{\"high\":300,\"highTime\":1,\"low\":250,\"lowTime\":1}}}";
             }
             if (url.endsWith("/1h")) {
-                return "{\"data\":{\"100\":{\"highPriceVolume\":5000,\"lowPriceVolume\":5000}}}";
+                return "{\"data\":{\"100\":{\"highPriceVolume\":5000,\"lowPriceVolume\":5000},"
+                        + "\"200\":{\"highPriceVolume\":5000,\"lowPriceVolume\":5000}}}";
             }
             throw new IllegalArgumentException("unexpected url: " + url);
         }
