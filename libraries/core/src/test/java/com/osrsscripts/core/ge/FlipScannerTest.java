@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.osrsscripts.core.model.FlipCandidate;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.MarketStat;
 import com.osrsscripts.core.model.PricePoint;
-import com.osrsscripts.core.model.VolumePoint;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -29,101 +29,146 @@ class FlipScannerTest {
         return m;
     }
 
-    private Map<Integer, PricePoint> prices() {
+    /** Live prices mirror the hourly averages unless a test overrides one to probe placement. */
+    private Map<Integer, PricePoint> latest() {
         Map<Integer, PricePoint> p = new HashMap<>();
-        p.put(100, new PricePoint(1100, t, 1000, t)); // margin 78, roi .078
-        p.put(200, new PricePoint(2100, t, 2000, t)); // margin 58, roi .029
-        p.put(300, new PricePoint(505, t, 500, t));   // margin -5 -> excluded
-        p.put(400, new PricePoint(0, t, 0, t));       // no data -> excluded
+        p.put(100, new PricePoint(1100, t, 1000, t));
+        p.put(200, new PricePoint(2100, t, 2000, t));
+        p.put(300, new PricePoint(505, t, 500, t));
         return p;
     }
 
-    private Map<Integer, VolumePoint> volumes() {
-        Map<Integer, VolumePoint> v = new HashMap<>();
-        v.put(100, new VolumePoint(600, 600));  // 1200
-        v.put(200, new VolumePoint(50, 50));    // 100
-        v.put(300, new VolumePoint(9999, 9999));
-        return v;
+    private Map<Integer, MarketStat> hourly() {
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(100, new MarketStat(1100, 1000, 600, 600)); // margin 78, roi .078, balanced 600
+        h.put(200, new MarketStat(2100, 2000, 50, 50));   // margin 58, roi .029, balanced 50
+        h.put(300, new MarketStat(505, 500, 9999, 9999)); // margin -5 -> excluded
+        return h;
     }
 
     @Test
     void rejectsNonPositiveMarginAndMissingData() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
         assertEquals(2, result.size());
-        assertTrue(result.stream().noneMatch(c -> c.itemId() == 300 || c.itemId() == 400));
+        assertTrue(result.stream().noneMatch(c -> c.itemId() == 300));
     }
 
     @Test
-    void ranksByCapitalDeployed() {
-        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
-        // capital = buyPrice * min(buyLimit, volume):
-        // 100: 1000 * min(1000,1200) = 1,000,000 ; 200: 2000 * min(100,100) = 200,000
-        assertEquals(100, result.get(0).itemId());
-        assertEquals(200, result.get(1).itemId());
-    }
-
-    @Test
-    void prefersTheCapitalHeavyItemOverTheMoreProfitableSmallOne() {
-        // The cheap item earns far more profit per cycle, but the pricey item deploys 15x the
-        // capital; with idle cash to spend, the capital-heavy offer must rank first.
+    void liquidityUsesTheLesserDirectionalVolumeNotTheSum() {
+        // 4000 + 10 = 4010 total clears a 1000 floor, but only 10 sell-side fills an hour means a
+        // flip would strand on the sell. The balanced (lesser) volume governs, so it is rejected.
         Map<Integer, ItemMeta> m = new HashMap<>();
-        m.put(1, new ItemMeta(1, "cheap", false, 1000)); // buy limit 1000
-        m.put(2, new ItemMeta(2, "pricey", false, 30));  // buy limit 30
+        m.put(1, new ItemMeta(1, "lopsided", false, 1000));
         Map<Integer, PricePoint> p = new HashMap<>();
-        p.put(1, new PricePoint(300, t, 100, t));          // buy 100, net margin ~194
-        p.put(2, new PricePoint(53_000, t, 50_000, t));    // buy 50000, net margin ~1940
-        Map<Integer, VolumePoint> v = new HashMap<>();
-        v.put(1, new VolumePoint(5000, 5000));
-        v.put(2, new VolumePoint(5000, 5000));
+        p.put(1, new PricePoint(1100, t, 1000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1100, 1000, 4000, 10));
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).minVolume(1000).build();
+
+        assertTrue(scanner.scan(m, p, h, config, tax).isEmpty());
+    }
+
+    @Test
+    void marginIsJudgedOnHourlyAveragesNotALatestOutlier() {
+        // A single outlier /latest trade makes the spread look fat (buy 1000, sell 1300), but the
+        // hour's averages show a thin, losing spread. The averaged decision rejects it.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "outlier", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1300, t, 1000, t)); // tempting latest spread
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1010, 1000, 5000, 5000)); // real hour: margin < 0 after tax
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        assertTrue(scanner.scan(m, p, h, config, tax).isEmpty());
+    }
+
+    @Test
+    void placesAtTheLivePriceWhileDecidingOnAverages() {
+        // Averages clear the filters; the offer prices come from /latest, not the averages.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "x", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1205, t, 995, t)); // live placement prices
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1200, 1000, 5000, 5000)); // averaged decision prices
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        FlipCandidate c = scanner.scan(m, p, h, config, tax).get(0);
+        assertEquals(995, c.buyPrice());   // live low, not avg 1000
+        assertEquals(1205, c.sellPrice()); // live high, not avg 1200
+    }
+
+    @Test
+    void skipsItemsWithNoLivePriceToPlaceAgainst() {
+        // Has hourly stats but no /latest entry: nothing to place an offer at, so it is skipped.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "stale", false, 1000));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1200, 1000, 5000, 5000));
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        assertTrue(scanner.scan(m, new HashMap<>(), h, config, tax).isEmpty());
+    }
+
+    @Test
+    void ranksByEstimatedProfitPerHour() {
+        // Cheap item: margin ~194, sustainable 1000/hr (buy-limit bound) -> ~194k/hr.
+        // Pricey item: margin ~1940, buy limit 30 -> 7.5/hr -> ~14.5k/hr. The faster item wins.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "fast", false, 4000));   // buy limit 4000 -> 1000/hr
+        m.put(2, new ItemMeta(2, "slow", false, 30));     // buy limit 30 -> 7.5/hr
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(300, t, 100, t));
+        p.put(2, new PricePoint(53_000, t, 50_000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(300, 100, 5000, 5000));
+        h.put(2, new MarketStat(53_000, 50_000, 5000, 5000));
         FlipConfig config = FlipConfig.builder()
                 .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
 
-        List<FlipCandidate> result = scanner.scan(m, p, v, config, tax);
+        List<FlipCandidate> result = scanner.scan(m, p, h, config, tax);
 
-        // capital: item1 = 100 * min(1000,5000) = 100,000 ; item2 = 50000 * min(30,5000) = 1,500,000
-        // profit: item1 ~ 194 * 1000 = 194,000 (higher) ; item2 ~ 1940 * 30 = 58,200
-        assertEquals(2, result.get(0).itemId(), "the capital-heavy item ranks first");
-        assertEquals(1, result.get(1).itemId());
+        assertEquals(1, result.get(0).itemId(), "the faster, higher gp/hr item ranks first");
+        assertEquals(2, result.get(1).itemId());
     }
 
     @Test
-    void capsCapitalAtThePerItemCapThenBreaksTiesByProfit() {
-        // Both items can deploy well past a 1M per-item cap, so they tie on capital; the higher-ROI
-        // one (more profit for the same gold) wins the tiebreak.
+    void breaksGpPerHourTiesTowardMoreCapitalDeployed() {
+        // Both have generous buy limits so the balanced volume sets the rate. gp/hr ties at 22,620
+        // (cheap 78 x 290 == pricey 290 x 78), but the pricier offer deploys more capital
+        // (10000 x 78 = 780k vs 1000 x 290 = 290k), so it wins the tiebreak.
         Map<Integer, ItemMeta> m = new HashMap<>();
-        m.put(1, new ItemMeta(1, "lowRoi", false, 1000));
-        m.put(2, new ItemMeta(2, "highRoi", false, 1000));
+        m.put(1, new ItemMeta(1, "cheap", false, 4000));
+        m.put(2, new ItemMeta(2, "pricey", false, 4000));
         Map<Integer, PricePoint> p = new HashMap<>();
-        p.put(1, new PricePoint(1_050, t, 1_000, t)); // buy 1000, thin margin
-        p.put(2, new PricePoint(1_200, t, 1_000, t)); // buy 1000, fat margin
-        Map<Integer, VolumePoint> v = new HashMap<>();
-        v.put(1, new VolumePoint(5000, 5000));
-        v.put(2, new VolumePoint(5000, 5000));
+        p.put(1, new PricePoint(1_100, t, 1_000, t));    // margin 78
+        p.put(2, new PricePoint(10_500, t, 10_000, t));  // margin 290
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1_100, 1_000, 290, 290));
+        h.put(2, new MarketStat(10_500, 10_000, 78, 78));
         FlipConfig config = FlipConfig.builder()
-                .minMarginGp(1).perItemCapitalCap(1_000_000L).build();
+                .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
 
-        List<FlipCandidate> result = scanner.scan(m, p, v, config, tax);
+        List<FlipCandidate> result = scanner.scan(m, p, h, config, tax);
 
-        // Both cap at 1M capital (1000 gp * 1000 units); item 2's higher margin breaks the tie.
-        assertEquals(2, result.get(0).itemId());
+        assertEquals(2, result.get(0).itemId(), "equal gp/hr -> the capital-heavier offer first");
         assertEquals(1, result.get(1).itemId());
     }
 
     @Test
     void appliesVolumeFloor() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).minVolume(200).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
         assertEquals(1, result.size());
-        assertEquals(100, result.get(0).itemId());
+        assertEquals(100, result.get(0).itemId()); // 200 has balanced 50 < 200
     }
 
     @Test
     void excludesMembersItemsWhenDisallowed() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).membersItemsAllowed(false).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
-        // 200 is members; 400 has no mapping entry, so membership is unknown -> excluded too.
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
         assertEquals(1, result.size());
         assertEquals(100, result.get(0).itemId());
     }
@@ -131,15 +176,15 @@ class FlipScannerTest {
     @Test
     void includesMembersItemsByDefault() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
         assertTrue(result.stream().anyMatch(c -> c.itemId() == 200));
     }
 
     @Test
     void appliesRoiFloor() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).minMarginPct(0.05).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
         assertEquals(1, result.size());
-        assertEquals(100, result.get(0).itemId());
+        assertEquals(100, result.get(0).itemId()); // roi .078 passes; 200 roi .029 fails
     }
 }

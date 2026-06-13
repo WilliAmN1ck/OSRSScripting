@@ -126,5 +126,15 @@
 - [x] Tests: fillSlots F2P count; FlipEngine full-3-slot board does not report MAX_SLOTS. Suite +
       fatJar green; reviewed (0 findings).
 - [ ] Live visual check: F2P full board no longer shows the advisory.
+## Item-selection rework — branch `item-selection-rework` (2026-06-13)
+- research (GE Tracker, 07Flip, OSRS Flipping Pro, LootHelper) + wiki API; spec + handoff in
+  docs/plans/item-selection-rework/. User chose full A+B+C, margins from 1h averages.
+- [x] A — directional liquidity: liquidity = min(highVol, lowVol), not the sum (MarketStat.balancedVolume).
+- [x] B — averaged margins, live placement: decide on /1h avgHigh/avgLow, place offers at /latest.
+- [x] C — GP/hr ranking: netMargin × min(balancedVolume, buyLimit/4), tie-break capital deployed.
+- [x] Model: VolumePoint → MarketStat (avg prices + both volumes); volumesOneHour() → hourlyStats().
+- [x] Tests: FlipScannerTest rewritten (liquidity, outlier-rejection, placement, gp/hr, tiebreak);
+      WikiPriceClientTest parses avg prices. Full suite + fatJar green. /code-review max: 0 findings.
+- [ ] Live soak: picks liquid/balanced/profitable items, deploys bankroll, no fill-rate regression.
 
 ## Phase 4 — Publish / distribution  (later / optional)

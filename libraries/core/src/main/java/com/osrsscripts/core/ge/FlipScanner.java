@@ -3,75 +3,97 @@ package com.osrsscripts.core.ge;
 import com.osrsscripts.core.model.FlipCandidate;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.MarketStat;
 import com.osrsscripts.core.model.PricePoint;
-import com.osrsscripts.core.model.VolumePoint;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Selects and ranks flip candidates from live market data. An item buys at its instant-sell price
- * ({@code low}) and sells at its instant-buy price ({@code high}); candidates failing the config's
- * margin, ROI, or volume floors are discarded. Ranking favours the capital each offer would
- * deploy — so a large bankroll is put to work rather than parked behind small, high-volume flips —
- * breaking ties by the profit that capital earns per cycle.
+ * Selects and ranks flip candidates from live market data. The margin decision uses the trailing
+ * hour's <em>averaged</em> prices (insta-sell {@code avgLow} to buy, insta-buy {@code avgHigh} to
+ * sell) so a single outlier trade cannot bait a bad item; offers are still <em>placed</em> at the
+ * current {@code /latest} price so they fill at market. Liquidity is the lesser of the two
+ * directional volumes — a round-trip must fill both a buy and a sell — and candidates are ranked
+ * by estimated profit per hour, breaking ties toward the offer that deploys the most capital.
  */
 public final class FlipScanner {
 
+    /** A 4-hour buy limit spread over the hours the rate is measured in. */
+    private static final double BUY_LIMIT_HOURS = 4.0;
+
     public List<FlipCandidate> scan(Map<Integer, ItemMeta> mapping,
-                                    Map<Integer, PricePoint> prices,
-                                    Map<Integer, VolumePoint> volumes,
+                                    Map<Integer, PricePoint> latest,
+                                    Map<Integer, MarketStat> hourly,
                                     FlipConfig config,
                                     GeTax tax) {
         List<FlipCandidate> candidates = new ArrayList<>();
 
-        for (Map.Entry<Integer, PricePoint> entry : prices.entrySet()) {
+        for (Map.Entry<Integer, MarketStat> entry : hourly.entrySet()) {
             int itemId = entry.getKey();
-            PricePoint price = entry.getValue();
-            if (!price.hasHigh() || !price.hasLow()) {
-                continue;
+            MarketStat stat = entry.getValue();
+            long avgBuy = stat.avgLowPrice();
+            long avgSell = stat.avgHighPrice();
+            if (avgBuy <= 0 || avgSell <= 0) {
+                continue; // no trades on a side this hour: can't price it reliably
             }
-            long buyPrice = price.low();
-            long sellPrice = price.high();
 
-            long margin = tax.netMarginPerItem(itemId, buyPrice, sellPrice);
+            long balancedVolume = stat.balancedVolume();
+            if (balancedVolume < config.minVolume()) {
+                continue; // illiquid on at least one side: a flip would strand here
+            }
+
+            long margin = tax.netMarginPerItem(itemId, avgBuy, avgSell);
             if (margin < config.minMarginGp()) {
                 continue;
             }
-            double roi = (double) margin / buyPrice;
+            double roi = (double) margin / avgBuy;
             if (roi < config.minMarginPct()) {
                 continue;
             }
-            VolumePoint volumePoint = volumes.get(itemId);
-            long volume = volumePoint != null ? volumePoint.total() : 0L;
-            if (volume < config.minVolume()) {
-                continue;
-            }
+
             ItemMeta meta = mapping.get(itemId);
             // Unknown membership is treated as members: on F2P a rejected offer would be
             // retried forever, so only items known to be free-to-play pass the filter.
             if (!config.membersItemsAllowed() && (meta == null || meta.members())) {
                 continue;
             }
+
+            // Decide on averages, but place at the live price so offers fill at market.
+            PricePoint live = latest.get(itemId);
+            if (live == null || !live.hasHigh() || !live.hasLow()) {
+                continue; // no live price to place against
+            }
             int buyLimit = meta != null ? meta.buyLimit() : 0;
 
-            candidates.add(new FlipCandidate(itemId, buyPrice, sellPrice, margin, volume, buyLimit,
-                    roi));
+            candidates.add(new FlipCandidate(itemId, live.low(), live.high(), margin,
+                    balancedVolume, buyLimit, roi));
         }
 
         long perItemCap = config.perItemCapitalCap();
         candidates.sort(Comparator
-                .comparingLong((FlipCandidate c) -> capitalDeployed(c, perItemCap)).reversed()
+                .comparingDouble(FlipScanner::gpPerHour).reversed()
                 .thenComparing(Comparator.comparingLong(
-                        (FlipCandidate c) -> profitPerCycle(c, perItemCap)).reversed())
+                        (FlipCandidate c) -> capitalDeployed(c, perItemCap)).reversed())
                 .thenComparingInt(FlipCandidate::itemId));
         return candidates;
     }
 
     /**
+     * Estimated profit per hour: net margin times the units the offer can sustainably round-trip
+     * in an hour, throttled by the balanced volume and the per-hour share of the 4h buy limit.
+     */
+    private static double gpPerHour(FlipCandidate candidate) {
+        double unitsPerHour = candidate.buyLimit() > 0
+                ? Math.min(candidate.volume(), candidate.buyLimit() / BUY_LIMIT_HOURS)
+                : candidate.volume();
+        return candidate.netMarginPerItem() * unitsPerHour;
+    }
+
+    /**
      * Units one offer could realistically buy in a cycle: throttled by the 4h buy limit, the
-     * traded volume, and how many the per-item capital cap can afford.
+     * balanced volume, and how many the per-item capital cap can afford.
      */
     private static long deployableUnits(FlipCandidate candidate, long perItemCap) {
         long throughput = candidate.buyLimit() > 0
@@ -81,13 +103,8 @@ public final class FlipScanner {
         return Math.min(throughput, byCap);
     }
 
-    /** Capital one offer would deploy — the primary ranking key, so big offers fill slots first. */
+    /** Capital one offer deploys — the tiebreak, so equally profitable offers fill big-first. */
     private static long capitalDeployed(FlipCandidate candidate, long perItemCap) {
         return candidate.buyPrice() * deployableUnits(candidate, perItemCap);
-    }
-
-    /** Profit that capital earns per cycle — the tiebreak among offers of equal size. */
-    private static long profitPerCycle(FlipCandidate candidate, long perItemCap) {
-        return candidate.netMarginPerItem() * deployableUnits(candidate, perItemCap);
     }
 }
