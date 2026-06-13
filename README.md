@@ -25,9 +25,11 @@ This software is provided for educational purposes only; use at your own risk.
   — net margin times the units the buy limit and **balanced** (lesser of buy/sell
   side) volume can sustain — tie-broken toward the offer that deploys more capital,
   within per-item and total capital caps. An item whose 5-minute price has dropped
-  sharply below the hour (a **falling knife**) is skipped for buying. Offers are
-  still **placed at the live price** so they fill at market. A **per-item trade history** auto-avoids recorded
-  losers, and stale sells **escalate to the insta-sell price** after N relists.
+  sharply below the hour (a **falling knife**) is skipped for buying. Buys are
+  **placed just above the live low** — by a small slice of the margin — so they
+  fill faster, with that bid-up taken off the margin. A **per-item trade history**
+  auto-avoids recorded losers, and stale sells **escalate to the insta-sell
+  price** after N relists.
   When GE slots or cash sit idle because of a config setting, the sidebar shows an
   **advisory naming the setting to adjust**.
 
