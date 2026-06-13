@@ -183,8 +183,23 @@
       Re-entrant (keys off isAnimating/isFull/bank-reachable). Hardcoded Draynor willow+bank defaults.
 - [x] 1.2 AccountBuilderScript wires it on TaskRunner + Antiban + break-handler shadow. Removed HeartbeatTask.
 - [x] compileKotlin + fatJar green (validates all SDK signatures against the real plugin SDK)
-- [ ] Live verify in Echo (the Phase 1 acceptance gate): chops, fills inv, banks, repeats. NOT yet deployed
-      (heartbeat jar preserved for Phase 0 verify). Deploy when ready to test.
-- [ ] PR held: stacked on unmerged Phase 0 PR #21; open/retarget after #21 merges.
+- [x] Tree-selection sidebar UI (TreeType + AccountBuilderPanel), level-gated, auto re-enable on level-up.
+- [x] Banking reworked: deposit each non-axe item id (fast, human-like gaps), confirm bank closed; close
+      a stray bank before walking; return to the remembered chop spot.
+- [x] Live-verified in Echo: cuts selected level-gated trees, banks all but the axe, walks back, repeats.
+- [x] PR #22 open (rebased onto main after #21 merged).
+- [x] Pre-merge: /code-review max (0 bugs; 3 minor non-blocking notes) + trimmed diagnostic logging.
+- [x] PR #22 merged — Phase 1 slice landed on main.
+
+## AIO Account Builder — Phase 2 (pure engine) — branch `account-builder-phase2`
+- engine/ is pure Kotlin (zero SDK), TDD. Per docs/plans/aio-account-builder/plan.md.
+- [x] Skill enum; GameView read-side seams (SkillView/InventoryView/QuestView + isMembersWorld).
+- [x] Requirements (skill levels/items/quests/members) + meets(view).
+- [x] TaskSpec (TaskKey/TaskProgress; isComplete + validate default=requirements + progress).
+- [x] BuilderScheduler (first !complete && validate; skip-complete; seeded deterministic shuffle).
+- [x] Watchdog (thin stall seam: CONTINUE/STOP on a no-progress window).
+- [x] 19 tests green (Requirements 6, Scheduler 7, Watchdog 3, + TreeType 3).
+- [ ] Deferred to persistence (Phase 4): BuildProfile + gson ProfileCodec + schema version.
+- [ ] Phase 3: refactor ChopAndBankTask → BuilderTask on this engine; bind GameView to SDK reads.
 
 ## Phase 4 — Publish / distribution  (later / optional)
