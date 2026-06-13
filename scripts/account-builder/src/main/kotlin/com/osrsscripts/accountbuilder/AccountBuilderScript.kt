@@ -98,6 +98,8 @@ class AccountBuilderScript : TribotScript {
 
     private fun woodcuttingLevel(): Int = Skill.WOODCUTTING.getActualLevel()
 
+    // Watchdog progress signal. Woodcutting-specific for now (the only task); switch to total XP
+    // once the backlog spans multiple skills, or a non-WC task would look like a WC stall.
     private fun woodcuttingXp(): Long = Skill.WOODCUTTING.getXp().toLong()
 
     private companion object {
@@ -106,7 +108,9 @@ class AccountBuilderScript : TribotScript {
         const val CADENCE_MIN_MS = 400L
         const val CADENCE_MAX_MS = 900L
         const val FATIGUE_MAX = 1.6
-        const val STALL_LIMIT_MS = 5L * 60 * 1000 // 5 minutes with no WC XP -> stop
+        // Generous: a look-away AFK plus a long bank round-trip legitimately gains no WC XP, so a
+        // tight window would false-stop a healthy run. Only a genuinely stuck run trips this. Tune at soak.
+        const val STALL_LIMIT_MS = 10L * 60 * 1000
         const val AFK_CHUNK_MS = 1_000L
         val FATIGUE_RAMP: Duration = Duration.ofHours(3)
         val AFK_MIN_GAP: Duration = Duration.ofMinutes(12)
