@@ -113,6 +113,8 @@
       trade-history table shows multiple rows; single age field split into buy/sell fields.
 - [x] Tests: engine split (divergent thresholds), legacy migration without state wipe, mapper
       round-trip, panel apply. Full suite + fatJar green. /code-review max: 0 findings.
-- [ ] Live visual check of scroll/history layout in the RuneLite sidebar.
+- [x] Live visual check on Echo: config section scrolls (scrollbar shown, capped height) and the
+      trade-history table renders multiple rows (4 visible). Migration loaded the user's 90-min age
+      into both buy/sell.
 
 ## Phase 4 — Publish / distribution  (later / optional)

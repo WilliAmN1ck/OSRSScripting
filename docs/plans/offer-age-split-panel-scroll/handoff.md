@@ -4,8 +4,8 @@
 **Date:** 2026-06-13
 **Branch:** `offer-age-split-and-panel-scroll`
 **Spec:** [`spec.md`](./spec.md)
-**Status:** ✅ Code complete, unit-tested, `/code-review max` clean (0 findings). Live visual
-check of the scroll/history layout still pending.
+**Status:** ✅ Code complete, unit-tested, `/code-review max` clean (0 findings). Live-verified on
+Echo: config section scrolls and the trade-history table shows multiple rows.
 
 ---
 
@@ -54,9 +54,6 @@ The (tall, label-above-input) config section is wrapped in a height-capped `JScr
 - Full suite + `fatJar` green.
 
 ## Known Issues / Tech Debt
-- **Live visual check pending** — confirm in the RuneLite sidebar that the config section scrolls
-  and the trade-history table shows multiple rows. (Logic is unit-covered; only the Swing layout
-  is unverified.)
 - `CONFIG_VIEWPORT_HEIGHT` is a fixed 220 px — fine for the current field count; revisit if many
   more config fields are added.
 
