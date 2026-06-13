@@ -1,6 +1,12 @@
-package com.osrsscripts.accountbuilder
+package com.osrsscripts.accountbuilder.task
 
-import com.osrsscripts.core.task.Task
+import com.osrsscripts.accountbuilder.TreeType
+import com.osrsscripts.accountbuilder.Walker
+import com.osrsscripts.accountbuilder.engine.GameView
+import com.osrsscripts.accountbuilder.engine.Requirements
+import com.osrsscripts.accountbuilder.engine.Skill
+import com.osrsscripts.accountbuilder.engine.TaskKey
+import com.osrsscripts.accountbuilder.engine.TaskProgress
 import org.tribot.script.sdk.Bank
 import org.tribot.script.sdk.Inventory
 import org.tribot.script.sdk.Log
@@ -11,20 +17,28 @@ import org.tribot.script.sdk.types.WorldTile
 import org.tribot.script.sdk.util.TribotRandom
 
 /**
- * Chop → bank loop. Cuts the nearest reachable tree among the user-selected, level-qualified
- * [TreeType]s (from the sidebar), banks at the nearest bank when full (walker handles obstacles /
- * stairs), then returns to the remembered chop spot. Each step keys off observable game state
- * (animating / inventory full / bank reachable), so it is re-entrant and safe to interrupt.
+ * Woodcutting as a [BuilderTask]: complete once Woodcutting reaches the target level; otherwise chop
+ * the nearest reachable user-selected, level-gated tree, bank all-but-axe at the nearest bank when
+ * full, and return to the remembered chop spot. Each step keys off observable game state, so it is
+ * re-entrant and safe to interrupt. (Execute is SDK-coupled and verified live.)
  */
-internal class ChopAndBankTask(
+internal class WoodcuttingTask(
     private val allowedTrees: () -> Set<TreeType>,
-) : Task {
+    private val targetLevel: () -> Int,
+) : BuilderTask {
+
+    override val key = TaskKey("woodcutting")
+    override val requirements = Requirements() // normal F2P trees need nothing beyond the tree itself
 
     // Captured the first time we chop, so we can walk back after banking — works wherever the user
     // starts at the trees, no hardcoded tiles.
     private var chopSpot: WorldTile? = null
 
-    override fun shouldRun(): Boolean = true
+    override fun isComplete(view: GameView): Boolean =
+        view.skills.level(Skill.WOODCUTTING) >= targetLevel()
+
+    override fun progress(view: GameView): TaskProgress =
+        TaskProgress("Woodcutting ${view.skills.level(Skill.WOODCUTTING)}/${targetLevel()}")
 
     override fun execute() {
         if (Inventory.isFull()) bank() else chop()
@@ -75,9 +89,7 @@ internal class ChopAndBankTask(
                 return
             }
         }
-        // Deposit every non-axe item type explicitly, each with a short, human-like gap. depositAll
-        // per item id is fast and reliably clears *all* types (logs plus any stray pickaxe/arrows),
-        // unlike depositAllExcept which moved only one type per call.
+        // Deposit every non-axe item type explicitly, each with a short, human-like gap.
         val depositIds = Query.inventory()
             .filter { item -> KEEP.none { keep -> keep.equals(item.name, ignoreCase = true) } }
             .toList()

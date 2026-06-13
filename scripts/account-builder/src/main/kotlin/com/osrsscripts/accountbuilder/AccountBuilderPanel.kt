@@ -7,6 +7,7 @@ import javax.swing.BorderFactory
 import javax.swing.JCheckBox
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JTextField
 import javax.swing.SwingUtilities
 
 /**
@@ -20,6 +21,7 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
     private var woodcuttingLevel: Int = initialWoodcuttingLevel
     private val checkBoxes = LinkedHashMap<TreeType, JCheckBox>()
     private val levelLabel = JLabel()
+    private val targetField = JTextField("99", 3)
 
     init {
         border = BorderFactory.createTitledBorder("Trees to cut")
@@ -34,6 +36,11 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
         levelLabel.text = levelText()
         c.gridy = row++
         add(levelLabel, c)
+
+        c.gridy = row++
+        add(JLabel("Target Woodcutting level (1-99):"), c)
+        c.gridy = row++
+        add(targetField, c)
 
         for (type in TreeType.values()) {
             val box = JCheckBox(label(type), type == TreeType.NORMAL)
@@ -51,6 +58,10 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
             .filter { (type, box) -> box.isSelected && woodcuttingLevel >= type.levelReq }
             .map { it.key }
             .toSet()
+
+    /** The user's target Woodcutting level (1-99); defaults to 99 on invalid input. */
+    fun targetLevel(): Int =
+        targetField.text.trim().toIntOrNull()?.coerceIn(1, 99) ?: 99
 
     /** Updates the known Woodcutting level (e.g. after a level-up) and re-gates the checkboxes. */
     fun setWoodcuttingLevel(level: Int) {
