@@ -3,7 +3,7 @@
 
 **Date:** 2026-06-13
 **Branch:** `sell-crash-exit`
-**Status:** ✅ Code complete, unit + integration tested, reviewed (0 findings). Live soak pending.
+**Status:** ✅ Code complete, unit + integration tested, reviewed (0 findings). Verified live 2026-06-13.
 
 ---
 
@@ -47,7 +47,7 @@ the existing "after N stale relists" escalation.
   green.
 
 ## Known Issues / Tech Debt
-- Live soak pending: confirm a held item caught in a real crash is dumped at the low.
+- Verified live 2026-06-13: a held item caught in a real crash is dumped at the low.
 - The 5% threshold is shared with the buy guard and internal (no sidebar knob), consistent with the
   prior "keep it internal" preference.
 
