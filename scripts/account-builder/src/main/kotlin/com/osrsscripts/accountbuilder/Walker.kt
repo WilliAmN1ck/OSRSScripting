@@ -10,16 +10,24 @@ import org.tribot.script.sdk.types.WorldTile
 
 /**
  * Minimal walking helper over the DentistWalker addon (mirrors the TRiBot community examples). Walks
- * to a tile, enabling run when it is worth it. Phase 1 uses it as a fallback when the target object
- * is not already reachable; later phases promote this into the shared `actions/` layer.
+ * to a tile or to the nearest bank, enabling run when it is worth it. Later phases promote this into
+ * the shared `actions/` layer.
  */
 internal object Walker {
 
     fun walkTo(tile: WorldTile): Boolean =
-        AutomationSdk.getContext().addonLibraries.dentistWalker.walkTo(tile.toWorldPoint()) {
-            enableRun()
-            WalkingCondition.State.CONTINUE
-        }
+        dentistWalker().walkTo(tile.toWorldPoint()) { runCondition() }
+
+    /** Walks to the nearest bank, pathing through obstacles/stairs (e.g. the Lumbridge upstairs bank). */
+    fun walkToBank(): Boolean =
+        dentistWalker().walkToBank { runCondition() }
+
+    private fun dentistWalker() = AutomationSdk.getContext().addonLibraries.dentistWalker
+
+    private fun runCondition(): WalkingCondition.State {
+        enableRun()
+        return WalkingCondition.State.CONTINUE
+    }
 
     private fun enableRun() {
         if (Options.isRunEnabled()) return
