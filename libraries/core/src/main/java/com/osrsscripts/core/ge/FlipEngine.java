@@ -94,7 +94,9 @@ public final class FlipEngine {
                 actions.add(FlipAction.collect(offer.slot()));
                 freeSlots.add(offer.slot());
             } else { // live
-                if (isStale(offer.placedAt(), now, config.maxOfferAge())) {
+                Duration maxAge = offer.side() == OfferSide.BUY
+                        ? config.maxOfferAgeBuy() : config.maxOfferAgeSell();
+                if (isStale(offer.placedAt(), now, maxAge)) {
                     actions.add(FlipAction.cancel(offer.slot()));
                     freeSlots.add(offer.slot());
                 } else {

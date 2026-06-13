@@ -38,7 +38,8 @@ class FlipEngineTest {
                 .capitalCap(10_000_000L)
                 .perItemCapitalCap(Long.MAX_VALUE)
                 .maxSlots(8)
-                .maxOfferAge(Duration.ofMinutes(30))
+                .maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .minMarginGp(1)
                 .build();
     }
@@ -125,6 +126,29 @@ class FlipEngineTest {
 
         List<FlipAction> actions = engine.decide(Collections.emptyList(), Collections.emptyMap(),
                 account, new BuyLimitLedger(), config(), now);
+
+        assertEquals(Collections.singletonList(FlipAction.cancel(0)), actions);
+    }
+
+    @Test
+    void buyAndSellOffersAgeOutOnTheirOwnThresholds() {
+        // Buy age 10 min, sell age 60 min. A 30-min-old buy is stale; a 30-min-old sell is not.
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L)
+                .perItemCapitalCap(Long.MAX_VALUE)
+                .maxSlots(8)
+                .maxOfferAgeBuy(Duration.ofMinutes(10))
+                .maxOfferAgeSell(Duration.ofMinutes(60))
+                .minMarginGp(1)
+                .build();
+        Instant old = now.minus(Duration.ofMinutes(30));
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 100, 1000, 0, 0, old));
+        offers.set(1, new GeOffer(1, OfferStatus.ACTIVE, OfferSide.SELL, 200, 1000, 0, 0, old));
+        AccountState account = new AccountState(10_000_000L, offers, Collections.emptyMap());
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), Collections.emptyMap(),
+                account, new BuyLimitLedger(), config, now);
 
         assertEquals(Collections.singletonList(FlipAction.cancel(0)), actions);
     }

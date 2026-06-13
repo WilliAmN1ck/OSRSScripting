@@ -6,9 +6,11 @@ import java.util.Objects;
 
 /**
  * Persistable form of the run configuration, so sidebar settings survive a script restart.
- * {@code maxOfferAge} is stored in minutes, matching the sidebar field.
+ * Offer ages are stored in minutes, matching the sidebar fields.
  */
 public final class PersistedConfig {
+
+    private static final long DEFAULT_OFFER_AGE_MINUTES = 30L;
 
     private final long capitalCap;
     private final long perItemCapitalCap;
@@ -16,7 +18,8 @@ public final class PersistedConfig {
     private final double minMarginPct;
     private final long minVolume;
     private final int maxSlots;
-    private final long maxOfferAgeMinutes;
+    private final long maxOfferAgeBuyMinutes;
+    private final long maxOfferAgeSellMinutes;
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
     private final int sellExitAfterRelists;
@@ -29,7 +32,9 @@ public final class PersistedConfig {
                            @JsonProperty("minMarginPct") double minMarginPct,
                            @JsonProperty("minVolume") long minVolume,
                            @JsonProperty("maxSlots") int maxSlots,
-                           @JsonProperty("maxOfferAgeMinutes") long maxOfferAgeMinutes,
+                           @JsonProperty("maxOfferAgeBuyMinutes") long maxOfferAgeBuyMinutes,
+                           @JsonProperty("maxOfferAgeSellMinutes") long maxOfferAgeSellMinutes,
+                           @JsonProperty("maxOfferAgeMinutes") Long legacyMaxOfferAgeMinutes,
                            @JsonProperty("membersItemsAllowed") boolean membersItemsAllowed,
                            @JsonProperty("minDeploymentGp") long minDeploymentGp,
                            @JsonProperty("sellExitAfterRelists") int sellExitAfterRelists,
@@ -40,7 +45,13 @@ public final class PersistedConfig {
         this.minMarginPct = minMarginPct;
         this.minVolume = minVolume;
         this.maxSlots = maxSlots;
-        this.maxOfferAgeMinutes = maxOfferAgeMinutes;
+        // Migration: state written before the buy/sell split has only the single
+        // maxOfferAgeMinutes; seed both new fields from it (or the default if neither exists),
+        // so an upgrading user keeps their setting instead of silently resetting.
+        long legacy = legacyMaxOfferAgeMinutes != null
+                ? legacyMaxOfferAgeMinutes : DEFAULT_OFFER_AGE_MINUTES;
+        this.maxOfferAgeBuyMinutes = maxOfferAgeBuyMinutes > 0 ? maxOfferAgeBuyMinutes : legacy;
+        this.maxOfferAgeSellMinutes = maxOfferAgeSellMinutes > 0 ? maxOfferAgeSellMinutes : legacy;
         this.membersItemsAllowed = membersItemsAllowed;
         this.minDeploymentGp = minDeploymentGp;
         this.sellExitAfterRelists = sellExitAfterRelists;
@@ -71,8 +82,12 @@ public final class PersistedConfig {
         return maxSlots;
     }
 
-    public long maxOfferAgeMinutes() {
-        return maxOfferAgeMinutes;
+    public long maxOfferAgeBuyMinutes() {
+        return maxOfferAgeBuyMinutes;
+    }
+
+    public long maxOfferAgeSellMinutes() {
+        return maxOfferAgeSellMinutes;
     }
 
     public boolean membersItemsAllowed() {
@@ -106,7 +121,8 @@ public final class PersistedConfig {
                 && Double.compare(minMarginPct, other.minMarginPct) == 0
                 && minVolume == other.minVolume
                 && maxSlots == other.maxSlots
-                && maxOfferAgeMinutes == other.maxOfferAgeMinutes
+                && maxOfferAgeBuyMinutes == other.maxOfferAgeBuyMinutes
+                && maxOfferAgeSellMinutes == other.maxOfferAgeSellMinutes
                 && membersItemsAllowed == other.membersItemsAllowed
                 && minDeploymentGp == other.minDeploymentGp
                 && sellExitAfterRelists == other.sellExitAfterRelists
@@ -116,8 +132,8 @@ public final class PersistedConfig {
     @Override
     public int hashCode() {
         return Objects.hash(capitalCap, perItemCapitalCap, minMarginGp, minMarginPct, minVolume,
-                maxSlots, maxOfferAgeMinutes, membersItemsAllowed, minDeploymentGp,
-                sellExitAfterRelists, avoidAfterLossGp);
+                maxSlots, maxOfferAgeBuyMinutes, maxOfferAgeSellMinutes, membersItemsAllowed,
+                minDeploymentGp, sellExitAfterRelists, avoidAfterLossGp);
     }
 
     @Override

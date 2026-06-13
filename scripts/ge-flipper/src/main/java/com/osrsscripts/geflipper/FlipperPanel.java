@@ -4,6 +4,7 @@ import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.model.FlipConfig;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -22,6 +23,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 
@@ -42,7 +44,8 @@ public final class FlipperPanel extends JPanel {
         MIN_VOLUME("Min hourly volume (units)"),
         MIN_DEPLOYMENT_GP("Min spend per buy (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
-        MAX_OFFER_AGE_MINUTES("Max offer age (minutes)"),
+        MAX_OFFER_AGE_BUY_MINUTES("Max buy offer age (minutes)"),
+        MAX_OFFER_AGE_SELL_MINUTES("Max sell offer age (minutes)"),
         SELL_EXIT_AFTER_RELISTS("Insta-sell after relists (0=off)"),
         AVOID_AFTER_LOSS_GP("Avoid item after net loss (gp, 0=off)");
 
@@ -54,6 +57,9 @@ public final class FlipperPanel extends JPanel {
     }
 
     private static final String[] HISTORY_COLUMNS = {"Item", "Net P/L", "Flips", "Qty"};
+
+    /** Capped height of the scrollable config section, leaving room for the trade-history table. */
+    private static final int CONFIG_VIEWPORT_HEIGHT = 220;
 
     private final Map<Field, JTextField> fields = new EnumMap<>(Field.class);
     private final JCheckBox membersCheckBox = new JCheckBox("Buy members items");
@@ -75,7 +81,16 @@ public final class FlipperPanel extends JPanel {
         super(new BorderLayout(0, 8));
         this.onApply = Objects.requireNonNull(onApply, "onApply");
         Objects.requireNonNull(onClearHistory, "onClearHistory");
-        add(buildConfigSection(Objects.requireNonNull(initial, "initial")), BorderLayout.NORTH);
+        // Cap the (tall, stacked) config section's height and let it scroll, so the stats and
+        // trade-history sections below get the freed space and the history table shows several rows.
+        JScrollPane configScroll = new JScrollPane(
+                buildConfigSection(Objects.requireNonNull(initial, "initial")),
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        configScroll.setBorder(BorderFactory.createEmptyBorder());
+        configScroll.getVerticalScrollBar().setUnitIncrement(12);
+        configScroll.setPreferredSize(new Dimension(0, CONFIG_VIEWPORT_HEIGHT));
+        add(configScroll, BorderLayout.NORTH);
         add(buildStatsSection(), BorderLayout.CENTER);
         applyButton.addActionListener(e -> apply());
         clearHistoryButton.addActionListener(e -> onClearHistory.run());
@@ -158,8 +173,10 @@ public final class FlipperPanel extends JPanel {
                 return Long.toString(config.minDeploymentGp());
             case MAX_SLOTS:
                 return Integer.toString(config.maxSlots());
-            case MAX_OFFER_AGE_MINUTES:
-                return Long.toString(config.maxOfferAge().toMinutes());
+            case MAX_OFFER_AGE_BUY_MINUTES:
+                return Long.toString(config.maxOfferAgeBuy().toMinutes());
+            case MAX_OFFER_AGE_SELL_MINUTES:
+                return Long.toString(config.maxOfferAgeSell().toMinutes());
             case SELL_EXIT_AFTER_RELISTS:
                 return Integer.toString(config.sellExitAfterRelists());
             case AVOID_AFTER_LOSS_GP:
@@ -182,7 +199,8 @@ public final class FlipperPanel extends JPanel {
     }
 
     private FlipConfig parseFields() {
-        long maxOfferAgeMinutes = parseLong(Field.MAX_OFFER_AGE_MINUTES, 1);
+        long maxOfferAgeBuyMinutes = parseLong(Field.MAX_OFFER_AGE_BUY_MINUTES, 1);
+        long maxOfferAgeSellMinutes = parseLong(Field.MAX_OFFER_AGE_SELL_MINUTES, 1);
         // Bound-check before narrowing: a value past Integer.MAX_VALUE would wrap negative.
         long maxSlotsValue = parseLong(Field.MAX_SLOTS, 1);
         if (maxSlotsValue > 8) {
@@ -197,7 +215,8 @@ public final class FlipperPanel extends JPanel {
                 .minVolume(parseLong(Field.MIN_VOLUME, 0))
                 .minDeploymentGp(parseLong(Field.MIN_DEPLOYMENT_GP, 0))
                 .maxSlots(maxSlots)
-                .maxOfferAge(Duration.ofMinutes(maxOfferAgeMinutes))
+                .maxOfferAgeBuy(Duration.ofMinutes(maxOfferAgeBuyMinutes))
+                .maxOfferAgeSell(Duration.ofMinutes(maxOfferAgeSellMinutes))
                 .membersItemsAllowed(membersCheckBox.isSelected())
                 .sellExitAfterRelists((int) Math.min(parseLong(Field.SELL_EXIT_AFTER_RELISTS, 0),
                         Integer.MAX_VALUE))

@@ -27,7 +27,8 @@ class FlipperPanelTest {
                 .minMarginPct(0.01)
                 .minVolume(1_000L)
                 .maxSlots(4)
-                .maxOfferAge(Duration.ofMinutes(30))
+                .maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .build();
     }
 
@@ -38,14 +39,16 @@ class FlipperPanelTest {
 
         panel.setField(FlipperPanel.Field.CAPITAL_CAP, "2000000");
         panel.setField(FlipperPanel.Field.MAX_SLOTS, "6");
-        panel.setField(FlipperPanel.Field.MAX_OFFER_AGE_MINUTES, "45");
+        panel.setField(FlipperPanel.Field.MAX_OFFER_AGE_BUY_MINUTES, "45");
+        panel.setField(FlipperPanel.Field.MAX_OFFER_AGE_SELL_MINUTES, "75");
         panel.clickApply();
 
         assertEquals(1, applied.size());
         FlipConfig config = applied.get(0);
         assertEquals(2_000_000L, config.capitalCap());
         assertEquals(6, config.maxSlots());
-        assertEquals(Duration.ofMinutes(45), config.maxOfferAge());
+        assertEquals(Duration.ofMinutes(45), config.maxOfferAgeBuy());
+        assertEquals(Duration.ofMinutes(75), config.maxOfferAgeSell());
         // Untouched fields keep their initial values.
         assertEquals(250_000L, config.perItemCapitalCap());
         assertEquals("", panel.errorText());

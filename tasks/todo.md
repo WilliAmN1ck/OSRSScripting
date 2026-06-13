@@ -102,4 +102,17 @@
       pending a clean flipping window (driven attempt hit a scheduled ~47-min Echo break, which
       incidentally confirmed break-shadowing works — flipper stayed idle while logged out).
 
+## Offer-age split + panel scroll — branch `offer-age-split-and-panel-scroll` (2026-06-13)
+- spec + handoff in docs/plans/offer-age-split-panel-scroll/
+- [x] Split FlipConfig.maxOfferAge → maxOfferAgeBuy / maxOfferAgeSell; FlipEngine picks the
+      threshold by offer.side() (one staleness check). Defaults 30 min each (no behaviour change).
+- [x] Persistence: PersistedConfig stores buy/sell minutes; nullable legacy maxOfferAgeMinutes
+      param seeds both on upgrade. Keeping it recognised avoids Jackson's unknown-property failure
+      wiping the whole saved state. StateMapper maps both ways.
+- [x] Panel: config section wrapped in a height-capped (220px) scrollable JScrollPane so the
+      trade-history table shows multiple rows; single age field split into buy/sell fields.
+- [x] Tests: engine split (divergent thresholds), legacy migration without state wipe, mapper
+      round-trip, panel apply. Full suite + fatJar green. /code-review max: 0 findings.
+- [ ] Live visual check of scroll/history layout in the RuneLite sidebar.
+
 ## Phase 4 — Publish / distribution  (later / optional)

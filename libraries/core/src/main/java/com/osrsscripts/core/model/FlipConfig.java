@@ -13,7 +13,8 @@ public final class FlipConfig {
     private final double minMarginPct;
     private final long minVolume;
     private final int maxSlots;
-    private final Duration maxOfferAge;
+    private final Duration maxOfferAgeBuy;
+    private final Duration maxOfferAgeSell;
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
     private final int sellExitAfterRelists;
@@ -26,7 +27,8 @@ public final class FlipConfig {
         this.minMarginPct = b.minMarginPct;
         this.minVolume = b.minVolume;
         this.maxSlots = b.maxSlots;
-        this.maxOfferAge = b.maxOfferAge;
+        this.maxOfferAgeBuy = b.maxOfferAgeBuy;
+        this.maxOfferAgeSell = b.maxOfferAgeSell;
         this.membersItemsAllowed = b.membersItemsAllowed;
         this.minDeploymentGp = b.minDeploymentGp;
         this.sellExitAfterRelists = b.sellExitAfterRelists;
@@ -66,9 +68,14 @@ public final class FlipConfig {
         return maxSlots;
     }
 
-    /** A live offer older than this is considered stale and is cancelled. */
-    public Duration maxOfferAge() {
-        return maxOfferAge;
+    /** A live buy offer older than this is considered stale and is cancelled. */
+    public Duration maxOfferAgeBuy() {
+        return maxOfferAgeBuy;
+    }
+
+    /** A live sell offer older than this is considered stale and is cancelled. */
+    public Duration maxOfferAgeSell() {
+        return maxOfferAgeSell;
     }
 
     /**
@@ -114,7 +121,8 @@ public final class FlipConfig {
         private double minMarginPct = 0.0;
         private long minVolume = 0L;
         private int maxSlots = 8;
-        private Duration maxOfferAge = Duration.ofMinutes(30);
+        private Duration maxOfferAgeBuy = Duration.ofMinutes(30);
+        private Duration maxOfferAgeSell = Duration.ofMinutes(30);
         private boolean membersItemsAllowed = true;
         private long minDeploymentGp = 0L;
         private int sellExitAfterRelists = 0;
@@ -151,8 +159,13 @@ public final class FlipConfig {
             return this;
         }
 
-        public Builder maxOfferAge(Duration v) {
-            this.maxOfferAge = v;
+        public Builder maxOfferAgeBuy(Duration v) {
+            this.maxOfferAgeBuy = v;
+            return this;
+        }
+
+        public Builder maxOfferAgeSell(Duration v) {
+            this.maxOfferAgeSell = v;
             return this;
         }
 

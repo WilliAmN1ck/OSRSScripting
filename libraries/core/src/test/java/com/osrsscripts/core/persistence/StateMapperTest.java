@@ -27,7 +27,8 @@ class StateMapperTest {
                 .minMarginPct(0.01)
                 .minVolume(5_000L)
                 .maxSlots(3)
-                .maxOfferAge(Duration.ofMinutes(30))
+                .maxOfferAgeBuy(Duration.ofMinutes(15))
+                .maxOfferAgeSell(Duration.ofMinutes(45))
                 .membersItemsAllowed(false)
                 .minDeploymentGp(1_000L)
                 .sellExitAfterRelists(3)
@@ -51,7 +52,8 @@ class StateMapperTest {
         assertEquals(0.01, restored.minMarginPct());
         assertEquals(5_000L, restored.minVolume());
         assertEquals(3, restored.maxSlots());
-        assertEquals(Duration.ofMinutes(30), restored.maxOfferAge());
+        assertEquals(Duration.ofMinutes(15), restored.maxOfferAgeBuy());
+        assertEquals(Duration.ofMinutes(45), restored.maxOfferAgeSell());
         assertEquals(false, restored.membersItemsAllowed());
         assertEquals(1_000L, restored.minDeploymentGp());
         assertEquals(3, restored.sellExitAfterRelists());
