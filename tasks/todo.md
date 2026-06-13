@@ -228,7 +228,10 @@
       NOTE: cross-location upgrade (walking to higher-tree spots as you level) is a future feature.
 - [ ] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check; bank PIN handling;
       random-event / non-break-logout (login handler) behaviour.
-- [ ] Deferred (need client / extraction): SDK fidgets (need sdk-support SdkFidget extraction);
-      persistence resume wiring + paint/stats (need live verify); MiniBreaks.
+- [x] Persistence WIRING (branch `account-builder-persistence-wiring`): panel toProfile()/applyProfile()
+      ↔ BuildProfile; load on start + save-on-change via ProfileStore in the script-settings dir. 37 tests.
+      Resume pending a live-verify. (deployLocally blocked while the Echo client holds the jar — redeploy when closed.)
+- [ ] Deferred: paint/stats overlay; SDK fidgets (need sdk-support SdkFidget extraction); MiniBreaks;
+      cross-location tree progression; the next-live-run edge cases (no-axe, bank PIN, randoms/login).
 
 ## Phase 4 — Publish / distribution  (later / optional)

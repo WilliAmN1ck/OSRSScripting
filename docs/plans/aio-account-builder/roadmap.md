@@ -16,7 +16,7 @@ update the relevant line. This exists so the north star is never lost to increme
 - [x] Task engine: `TaskSpec` (isComplete/validate) + `BuilderScheduler` (skip-complete, validate-gate, seeded shuffle) — tested + live
 - [x] Prioritized-task pattern (tut-island ≈ core.task.Task); behavior trees optional per-task
 - [x] Manual ordered task list + **task shuffling** (seeded, deterministic)
-- [~] State persistence / resume — foundation built (BuildProfile/Codec/Store, tested); script wiring deferred
+- [x] State persistence — config (trees + target) saved/restored via ProfileStore in the script-settings dir; wired + tested (resume pending a live-verify)
 - [ ] Auto-planner on top of the manual list (declarative target → ordering) — *deferred, design must not preclude*
 - [ ] Extract reusable engine/helpers to `libraries/sdk-support` (Path A fast-follow)
 

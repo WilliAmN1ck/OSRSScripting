@@ -1,5 +1,7 @@
 package com.osrsscripts.accountbuilder
 
+import com.osrsscripts.accountbuilder.engine.profile.BuildProfile
+import com.osrsscripts.accountbuilder.engine.profile.TaskConfig
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -33,5 +35,25 @@ class AccountBuilderPanelTest {
     @Test
     fun targetLevelDefaultsToNinetyNine() {
         assertEquals(99, AccountBuilderPanel(1).targetLevel())
+    }
+
+    @Test
+    fun applyThenSnapshotPreservesSelectionAndTarget() {
+        val profile = BuildProfile(
+            tasks = listOf(TaskConfig("woodcutting", mapOf("trees" to "OAK,YEW", "target" to "60"))),
+        )
+        val panel = AccountBuilderPanel(1)
+        panel.applyProfile(profile)
+
+        val wc = panel.toProfile().tasks.single { it.key == "woodcutting" }
+        assertEquals("60", wc.params["target"])
+        assertEquals(setOf("OAK", "YEW"), wc.params["trees"]!!.split(",").toSet())
+    }
+
+    @Test
+    fun applyingAProfileWithoutWoodcuttingKeepsDefaults() {
+        val panel = AccountBuilderPanel(1)
+        panel.applyProfile(BuildProfile()) // empty first-run default
+        assertTrue(TreeType.NORMAL in panel.selectedTrees())
     }
 }
