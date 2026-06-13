@@ -7,6 +7,7 @@ import com.osrsscripts.accountbuilder.view.SdkGameView
 import com.osrsscripts.core.task.TaskRunner
 import org.tribot.automation.TribotScript
 import org.tribot.automation.script.ScriptContext
+import org.tribot.script.sdk.Login
 import org.tribot.script.sdk.Skill
 import org.tribot.script.sdk.antiban.Antiban
 
@@ -34,6 +35,12 @@ class AccountBuilderScript : TribotScript {
             while (!Thread.currentThread().isInterrupted) {
                 // Shadow client-scheduled breaks: stay idle while on break.
                 if (context.sidecars.breakHandler.isOnBreak) {
+                    context.waiting.sleep(BREAK_POLL_MS)
+                    continue
+                }
+                // Never act (or read skill levels) while logged out — the break/login handler
+                // brings us back in; until then, stay idle.
+                if (!Login.isLoggedIn()) {
                     context.waiting.sleep(BREAK_POLL_MS)
                     continue
                 }

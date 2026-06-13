@@ -91,7 +91,7 @@ internal class WoodcuttingTask(
         }
         // Deposit every non-axe item type explicitly, each with a short, human-like gap.
         val depositIds = Query.inventory()
-            .filter { item -> KEEP.none { keep -> keep.equals(item.name, ignoreCase = true) } }
+            .filter { item -> !Axes.isAxe(item.name) }
             .toList()
             .map { it.id }
             .distinct()
@@ -104,12 +104,6 @@ internal class WoodcuttingTask(
     }
 
     private companion object {
-        // Keep any axe; deposit everything else (logs, junk, stray tools/ammo).
-        val KEEP = arrayOf(
-            "Bronze axe", "Iron axe", "Steel axe", "Black axe",
-            "Mithril axe", "Adamant axe", "Rune axe", "Dragon axe",
-        )
-
         const val CHOP_TIMEOUT_MS = 8_000
         const val DEPOSIT_GAP_MIN_MS = 20
         const val DEPOSIT_GAP_MAX_MS = 80
