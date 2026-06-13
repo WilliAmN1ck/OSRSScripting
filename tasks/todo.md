@@ -208,7 +208,9 @@
 - [x] MainBacklogTask drives BuilderScheduler; AccountBuilderScript wires it; ChopAndBankTask removed.
 - [x] Panel: "Target Woodcutting level" field. compile + 19 tests + fatJar + deploy green.
 - [ ] Pre-merge: /code-review max, then merge.
-- [ ] Live verify (Echo): chop→bank→repeat via the scheduler; stops at the target level. (PARKED — needs computer-use approval; user away.)
+- [x] Live verify (Echo) — DONE 2026-06-13 on test acct (Y8Tgy4wij): chop, Lumbridge multi-floor bank+return,
+      stop-at-target (log "all tasks complete — stopping" at WC 11), hands-off "unlocks at N" UI, 10+ min stable,
+      no watchdog false-stop. Handoffs: phase-3-woodcutting-task/handoff.md, phase-4-persistence-and-hardening/handoff.md.
 
 ## AIO Account Builder — Phase 4 (persistence foundation) — branch `account-builder-phase4` (stacked on Phase 3)
 - Pure part only (no client needed). engine/profile.
