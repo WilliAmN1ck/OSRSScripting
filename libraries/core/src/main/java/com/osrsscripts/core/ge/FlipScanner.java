@@ -25,9 +25,6 @@ public final class FlipScanner {
     /** A 4-hour buy limit spread over the hours the rate is measured in. */
     private static final double BUY_LIMIT_HOURS = 4.0;
 
-    /** Skip a buy when the 5-minute average has fallen this far below the hour — a falling knife. */
-    private static final double DOWNTREND_DROP = 0.05;
-
     public List<FlipCandidate> scan(Map<Integer, ItemMeta> mapping,
                                     Map<Integer, PricePoint> latest,
                                     Map<Integer, MarketStat> hourly,
@@ -47,7 +44,7 @@ public final class FlipScanner {
                 continue;
             }
 
-            if (isFallingKnife(recent, stat)) {
+            if (MarketTrend.isFallingKnife(recent, stat, MarketTrend.DEFAULT_DROP)) {
                 continue; // sell-side price dropping sharply: don't buy into the crash
             }
 
@@ -99,17 +96,6 @@ public final class FlipScanner {
     /** Whether a stat priced both sides in its window, so its averages are usable. */
     private static boolean hasBothSides(MarketStat stat) {
         return stat != null && stat.avgHighPrice() > 0 && stat.avgLowPrice() > 0;
-    }
-
-    /**
-     * Whether the recent (5-minute) sell-side price has dropped sharply below the hour's — a
-     * falling knife the bot would buy into only to sell lower. Needs both prices to compare.
-     */
-    private static boolean isFallingKnife(MarketStat recent, MarketStat hour) {
-        if (recent == null || recent.avgLowPrice() <= 0 || hour.avgLowPrice() <= 0) {
-            return false;
-        }
-        return recent.avgLowPrice() < hour.avgLowPrice() * (1.0 - DOWNTREND_DROP);
     }
 
     /**
