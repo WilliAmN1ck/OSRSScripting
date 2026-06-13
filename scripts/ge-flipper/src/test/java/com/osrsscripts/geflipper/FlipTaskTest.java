@@ -392,8 +392,10 @@ class FlipTaskTest {
                         + "\"200\":{\"high\":300,\"highTime\":1,\"low\":250,\"lowTime\":1}}}";
             }
             if (url.endsWith("/1h")) {
-                return "{\"data\":{\"100\":{\"highPriceVolume\":5000,\"lowPriceVolume\":5000},"
-                        + "\"200\":{\"highPriceVolume\":5000,\"lowPriceVolume\":5000}}}";
+                return "{\"data\":{\"100\":{\"avgHighPrice\":200,\"avgLowPrice\":100,"
+                        + "\"highPriceVolume\":5000,\"lowPriceVolume\":5000},"
+                        + "\"200\":{\"avgHighPrice\":300,\"avgLowPrice\":250,"
+                        + "\"highPriceVolume\":5000,\"lowPriceVolume\":5000}}}";
             }
             throw new IllegalArgumentException("unexpected url: " + url);
         }

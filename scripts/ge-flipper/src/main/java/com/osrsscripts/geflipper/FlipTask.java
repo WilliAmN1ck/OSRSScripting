@@ -16,10 +16,10 @@ import com.osrsscripts.core.model.FlipCandidate;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.MarketStat;
 import com.osrsscripts.core.model.OfferSide;
 import com.osrsscripts.core.model.OfferStatus;
 import com.osrsscripts.core.model.PricePoint;
-import com.osrsscripts.core.model.VolumePoint;
 import com.osrsscripts.core.persistence.PersistedState;
 import com.osrsscripts.core.persistence.StateMapper;
 import com.osrsscripts.core.prices.WikiPriceClient;
@@ -118,11 +118,11 @@ public final class FlipTask implements Task {
         }
         Map<Integer, ItemMeta> mapping;
         Map<Integer, PricePoint> latest;
-        Map<Integer, VolumePoint> volumes;
+        Map<Integer, MarketStat> hourly;
         try {
             mapping = prices.mapping();
             latest = prices.latest();
-            volumes = prices.volumesOneHour();
+            hourly = prices.hourlyStats();
         } catch (IOException e) {
             // Transient market-data failure: skip this tick, try again next loop.
             return;
@@ -143,7 +143,7 @@ public final class FlipTask implements Task {
         }
         AccountState account =
                 new AccountState(client.coins(), offers, sellableStock(mapping, currentConfig));
-        List<FlipCandidate> candidates = scanner.scan(mapping, latest, volumes, currentConfig, tax);
+        List<FlipCandidate> candidates = scanner.scan(mapping, latest, hourly, currentConfig, tax);
         // History has the final word: items that keep losing money stop being candidates.
         candidates.removeIf(
                 c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
