@@ -49,14 +49,17 @@ class AccountBuilderScript : TribotScript {
 
         try {
             while (!Thread.currentThread().isInterrupted) {
-                // Shadow client-scheduled breaks: stay idle while on break.
+                // Shadow client-scheduled breaks: stay idle while on break. Reset the watchdog so the
+                // break's zero-XP stretch doesn't count as a stall the moment we resume.
                 if (context.sidecars.breakHandler.isOnBreak) {
+                    watchdog.reset()
                     context.waiting.sleep(IDLE_POLL_MS)
                     continue
                 }
                 // Never act (or read skill levels) while logged out — the break/login handler
-                // brings us back in; until then, stay idle.
+                // brings us back in; until then, stay idle (and don't count it as a stall).
                 if (!Login.isLoggedIn()) {
+                    watchdog.reset()
                     context.waiting.sleep(IDLE_POLL_MS)
                     continue
                 }

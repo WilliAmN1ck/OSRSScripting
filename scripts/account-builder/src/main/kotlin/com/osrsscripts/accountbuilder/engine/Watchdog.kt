@@ -20,4 +20,13 @@ class Watchdog(private val stallLimitMs: Long) {
         }
         return if (nowMs - lastChangeAtMs >= stallLimitMs) Decision.STOP else Decision.CONTINUE
     }
+
+    /**
+     * Forgets the progress history so the next [evaluate] starts a fresh window. Call this around
+     * legitimate no-progress gaps the watchdog must not count — e.g. while on a break or logged out,
+     * where zero XP is expected and would otherwise trip the stall the moment we resume.
+     */
+    fun reset() {
+        lastSignal = null
+    }
 }
