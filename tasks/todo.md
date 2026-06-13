@@ -117,4 +117,14 @@
       trade-history table renders multiple rows (4 visible). Migration loaded the user's 90-min age
       into both buy/sell.
 
+## F2P GE slot count — branch `f2p-slot-count` (2026-06-13)
+- handoff in docs/plans/f2p-slot-count/. Found while monitoring a live F2P run.
+- [x] Root cause: SdkGeClient padded offers to 8 slots always; on F2P the 5 phantom empty slots
+      made the engine emit MAX_SLOTS ("raise Max GE slots") with all 3 real slots full.
+- [x] Fix: OfferMapper.fillSlots(present, count) (fillEightSlots delegates); SdkGeClient pads to
+      Worlds.getCurrent().isMembers() ? 8 : 3 (defaults members/8 when unknown). Engine unchanged.
+- [x] Tests: fillSlots F2P count; FlipEngine full-3-slot board does not report MAX_SLOTS. Suite +
+      fatJar green; reviewed (0 findings).
+- [ ] Live visual check: F2P full board no longer shows the advisory.
+
 ## Phase 4 — Publish / distribution  (later / optional)

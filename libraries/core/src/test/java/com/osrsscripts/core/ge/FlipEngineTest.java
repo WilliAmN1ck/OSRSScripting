@@ -313,6 +313,26 @@ class FlipEngineTest {
     }
 
     @Test
+    void planDoesNotReportMaxSlotsWhenAFullFreeToPlayBoardHasNoOpenSlots() {
+        // On a free-to-play world the client reports only three slots. Filling all three must not
+        // look like the slot cap is stranding capacity — there are no further slots to raise it to.
+        List<GeOffer> offers = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            offers.add(new GeOffer(i, OfferStatus.ACTIVE, OfferSide.BUY, 500 + i, 100, 1, 0, now));
+        }
+        AccountState account = new AccountState(1_000_000L, offers, Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(3).minMarginGp(1)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 1000, 1100, 1000));
+
+        FlipPlan plan = engine.plan(ranked, Collections.emptyMap(), account, new BuyLimitLedger(),
+                config, now);
+
+        assertEquals(IdleReason.NONE, plan.idleReason());
+    }
+
+    @Test
     void planReportsNoCandidatesWhenFiltersStarveTheEngine() {
         AccountState account = new AccountState(1_000_000L, emptySlots(8), Collections.emptyMap());
 

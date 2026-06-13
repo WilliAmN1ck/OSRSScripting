@@ -65,4 +65,18 @@ class OfferMapperTest {
         assertEquals(OfferStatus.EMPTY, all.get(0).status(), "unoccupied slot is empty");
         assertEquals(OfferStatus.EMPTY, all.get(7).status());
     }
+
+    @Test
+    void fillSlotsHonoursTheFreeToPlaySlotCount() {
+        // A free-to-play world exposes only three GE slots; the other five must not appear as idle
+        // capacity, or the engine wrongly reports the slot cap as the cause of unused slots.
+        GeOffer atTwo = OfferMapper.toGeOffer(2, "IN_PROGRESS", "BUY", 7, 10, 1, 0, 0L);
+
+        List<GeOffer> slots = OfferMapper.fillSlots(List.of(atTwo), OfferMapper.FREE_SLOT_COUNT);
+
+        assertEquals(3, slots.size());
+        assertEquals(atTwo, slots.get(1));
+        assertEquals(OfferStatus.EMPTY, slots.get(0).status());
+        assertEquals(OfferStatus.EMPTY, slots.get(2).status());
+    }
 }
