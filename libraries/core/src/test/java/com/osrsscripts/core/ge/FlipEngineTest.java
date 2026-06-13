@@ -130,6 +130,84 @@ class FlipEngineTest {
     }
 
     @Test
+    void minDeploymentFloorSkipsTrivialBuys() {
+        // 64 gp of leftover budget must not waste a slot on a 44 gp buy.
+        AccountState account = new AccountState(64L, emptySlots(8), Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8)
+                .minMarginGp(1).minDeploymentGp(1_000L)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 22, 30, 1000));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
+                new BuyLimitLedger(), config, now);
+
+        assertTrue(actions.isEmpty());
+    }
+
+    @Test
+    void deploymentAtOrAboveFloorStillBuys() {
+        AccountState account = new AccountState(50_000L, emptySlots(8), Collections.emptyMap());
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(8)
+                .minMarginGp(1).minDeploymentGp(1_000L)
+                .build();
+        List<FlipCandidate> ranked = Collections.singletonList(candidate(100, 22, 30, 10_000));
+
+        List<FlipAction> actions = engine.decide(ranked, Collections.emptyMap(), account,
+                new BuyLimitLedger(), config, now);
+
+        // 50_000 / 22 = 2272 units, 49_984 gp deployed: well above the floor.
+        assertEquals(Collections.singletonList(FlipAction.placeBuy(0, 100, 22, 2272)), actions);
+    }
+
+    @Test
+    void pendingSellPreemptsTheWeakestLiveBuy() {
+        List<GeOffer> offers = emptySlots(8);
+        offers.set(0, new GeOffer(0, OfferStatus.PARTIAL, OfferSide.BUY, 1700, 2030, 57, 3, now));
+        offers.set(1, new GeOffer(1, OfferStatus.ACTIVE, OfferSide.BUY, 1519, 22, 2, 0, now));
+        offers.set(2, new GeOffer(2, OfferStatus.ACTIVE, OfferSide.BUY, 2357, 100, 1, 0, now));
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(349, new PricePoint(124, now, 110, now));
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(349, 2); // waiting to sell, but maxSlots 3 are all buys
+        AccountState account = new AccountState(0L, offers, stock);
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(3)
+                .minMarginGp(1)
+                .build();
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config, now);
+
+        // Slot 1 holds the smallest remaining commitment (2 x 22 = 44 gp): evict it.
+        assertEquals(Collections.singletonList(FlipAction.cancel(1)), actions);
+    }
+
+    @Test
+    void pendingSellNeverPreemptsLiveSells() {
+        List<GeOffer> offers = emptySlots(8);
+        for (int i = 0; i < 3; i++) {
+            offers.set(i, new GeOffer(i, OfferStatus.ACTIVE, OfferSide.SELL, 200 + i, 100, 5, 0,
+                    now));
+        }
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(349, new PricePoint(124, now, 110, now));
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(349, 2);
+        AccountState account = new AccountState(0L, offers, stock);
+        FlipConfig config = FlipConfig.builder()
+                .capitalCap(10_000_000L).perItemCapitalCap(Long.MAX_VALUE).maxSlots(3)
+                .minMarginGp(1)
+                .build();
+
+        List<FlipAction> actions = engine.decide(Collections.emptyList(), prices, account,
+                new BuyLimitLedger(), config, now);
+
+        assertTrue(actions.isEmpty());
+    }
+
+    @Test
     void totalCapitalCapLimitsNewBuyQuantity() {
         List<GeOffer> offers = emptySlots(8);
         offers.set(0, new GeOffer(0, OfferStatus.ACTIVE, OfferSide.BUY, 200, 1000, 500, 0, now));

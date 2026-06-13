@@ -52,14 +52,20 @@ public final class FlipTask implements Task {
     private final OfferTracker tracker;
     private final Supplier<FlipConfig> config;
     private final FlipActionExecutor executor;
+    /** Idle ticks before the GE interface is closed (a human doesn't stare at a static screen). */
+    static final int IDLE_TICKS_BEFORE_CLOSE = 5;
+
     private final Consumer<PersistedState> persister;
     private final Duration retryBackoff;
+    private final IdleBehavior idle;
     private Instant retryAfter = Instant.MIN;
+    private int idleTicks;
 
     public FlipTask(GeClient client, WikiPriceClient prices, FlipScanner scanner, FlipEngine engine,
                     GeTax tax, BuyLimitLedger ledger, StockLedger stock, OfferTracker tracker,
                     Supplier<FlipConfig> config, FlipActionExecutor executor,
-                    Consumer<PersistedState> persister, Duration retryBackoff) {
+                    Consumer<PersistedState> persister, Duration retryBackoff,
+                    IdleBehavior idle) {
         this.client = Objects.requireNonNull(client, "client");
         this.prices = Objects.requireNonNull(prices, "prices");
         this.scanner = Objects.requireNonNull(scanner, "scanner");
@@ -72,6 +78,7 @@ public final class FlipTask implements Task {
         this.executor = Objects.requireNonNull(executor, "executor");
         this.persister = Objects.requireNonNull(persister, "persister");
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff");
+        this.idle = Objects.requireNonNull(idle, "idle");
     }
 
     @Override
@@ -104,8 +111,16 @@ public final class FlipTask implements Task {
         List<FlipAction> actions =
                 engine.decide(candidates, latest, account, ledger, currentConfig, now);
         if (actions.isEmpty()) {
-            return; // nothing to do: leave the GE interface alone
+            // Nothing to do (e.g. every slot committed): after a short grace period close the
+            // GE — a human doesn't stare at a static interface — and fidget occasionally.
+            idleTicks++;
+            if (idleTicks >= IDLE_TICKS_BEFORE_CLOSE && client.isOpen()) {
+                client.close();
+            }
+            idle.onIdle(now);
+            return;
         }
+        idleTicks = 0;
         if (!client.isOpen()) {
             if (!client.open()) {
                 retryAfter = now.plus(retryBackoff); // e.g. not at the GE booth: don't spam open

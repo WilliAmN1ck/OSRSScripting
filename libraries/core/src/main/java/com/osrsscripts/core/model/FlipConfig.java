@@ -15,6 +15,7 @@ public final class FlipConfig {
     private final int maxSlots;
     private final Duration maxOfferAge;
     private final boolean membersItemsAllowed;
+    private final long minDeploymentGp;
 
     private FlipConfig(Builder b) {
         this.capitalCap = b.capitalCap;
@@ -25,6 +26,7 @@ public final class FlipConfig {
         this.maxSlots = b.maxSlots;
         this.maxOfferAge = b.maxOfferAge;
         this.membersItemsAllowed = b.membersItemsAllowed;
+        this.minDeploymentGp = b.minDeploymentGp;
     }
 
     /**
@@ -73,6 +75,14 @@ public final class FlipConfig {
         return membersItemsAllowed;
     }
 
+    /**
+     * Minimum gp a new buy offer must deploy to be worth a GE slot. Leftover slivers of budget
+     * otherwise occupy slots that pending sells need. {@code 0} disables the floor.
+     */
+    public long minDeploymentGp() {
+        return minDeploymentGp;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -86,6 +96,7 @@ public final class FlipConfig {
         private int maxSlots = 8;
         private Duration maxOfferAge = Duration.ofMinutes(30);
         private boolean membersItemsAllowed = true;
+        private long minDeploymentGp = 0L;
 
         /** Required for buying: leaving this at the default {@code 0} disables all buy offers. */
         public Builder capitalCap(long v) {
@@ -125,6 +136,11 @@ public final class FlipConfig {
 
         public Builder membersItemsAllowed(boolean v) {
             this.membersItemsAllowed = v;
+            return this;
+        }
+
+        public Builder minDeploymentGp(long v) {
+            this.minDeploymentGp = v;
             return this;
         }
 

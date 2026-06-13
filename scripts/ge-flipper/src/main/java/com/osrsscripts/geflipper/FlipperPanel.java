@@ -36,6 +36,7 @@ public final class FlipperPanel extends JPanel {
         MIN_MARGIN_GP("Min margin (gp)"),
         MIN_MARGIN_PCT("Min margin (fraction)"),
         MIN_VOLUME("Min volume (units/h)"),
+        MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
         MAX_OFFER_AGE_MINUTES("Max offer age (minutes)");
 
@@ -116,6 +117,8 @@ public final class FlipperPanel extends JPanel {
                 return Double.toString(config.minMarginPct());
             case MIN_VOLUME:
                 return Long.toString(config.minVolume());
+            case MIN_DEPLOYMENT_GP:
+                return Long.toString(config.minDeploymentGp());
             case MAX_SLOTS:
                 return Integer.toString(config.maxSlots());
             case MAX_OFFER_AGE_MINUTES:
@@ -151,6 +154,7 @@ public final class FlipperPanel extends JPanel {
                 .minMarginGp(parseLong(Field.MIN_MARGIN_GP, 0))
                 .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT))
                 .minVolume(parseLong(Field.MIN_VOLUME, 0))
+                .minDeploymentGp(parseLong(Field.MIN_DEPLOYMENT_GP, 0))
                 .maxSlots(maxSlots)
                 .maxOfferAge(Duration.ofMinutes(maxOfferAgeMinutes))
                 .membersItemsAllowed(membersCheckBox.isSelected())

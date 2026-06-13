@@ -80,7 +80,18 @@ Run on the throwaway F2P account, user driving:
 Sell-exit escalation (decision 9 of 3c — revisit *after* the soak data), proxy/bulk-launch
 CLI features, members-world testing, performance tuning beyond what the soak surfaces.
 
-## 7. Risk note
+## 7. Addendum — features added during 3d (user request, Q&A 2026-06-12)
+
+| # | Question | Decision |
+|---|---|---|
+| A1 | Idle behavior when all slots are committed | **Close GE + light fidgets**: after 5 consecutive idle ticks the GE closes; humanized fidgets (camera drift / side-tab glance) fire at randomized 15–45 s intervals via `core.humanize.DelayDistribution`; the SDK's Script AI Antiban is enabled at startup. Full activity simulation (wandering etc.) rejected as disproportionate. |
+| A2 | "Prioritize best items" meaning | **Min-deployment floor** (`FlipConfig.minDeploymentGp`, sidebar field, default 1,000 gp on fresh installs / 0 on restored old configs): a buy below the floor never takes a slot. **Sells preempt weak buys**: when stock waits to sell and no slot is free, the live buy with the smallest remaining gp commitment is cancelled (one per tick). Capital concentration declined (already current behavior). |
+| A3 | Delivery | Same PR (#7), on `phase-3d-live-verification`. |
+
+Note: A1 deliberately goes beyond 3c decision 8 (which still holds for *sidecars*) — the
+Script AI Antiban flag is a different toggle and enabling it is the point of the feature.
+
+## 8. Risk note
 
 Botting violates Jagex's rules; the account is expendable by decision 2. Keep the cash
 stack at what you're willing to lose to a ban mid-flip (open offers are recoverable via

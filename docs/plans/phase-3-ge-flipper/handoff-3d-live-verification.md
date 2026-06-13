@@ -84,11 +84,20 @@ All suites green. New/updated: `FlipScannerTest` (members filter ×2),
 `StateMapperTest` (config restore ×2), `FlipTaskTest` (open-on-demand ×2, placement
 backoff, open backoff), `FlipActionExecutorTest` (failure reporting ×2).
 
-## Known Issues / Tech Debt
+## Features added post-verification (user request — spec §7 addendum)
 
-- **Sells don't preempt buys for slots**: 115k of bought stock waited ~25 min for a sell
-  slot while two sub-100 gp buys occupied the GE. Staleness self-corrects, but slot
-  priority (sell-first eviction) is the highest-value engine improvement on the list.
+- **Idle antiban**: when a tick has nothing to do, the GE closes after a 5-tick grace
+  period and `HumanizedIdle` fidgets (camera drift / side-tab glance via `SdkFidget`) at
+  randomized 15–45 s intervals — first use of `core.humanize.DelayDistribution`. Echo's
+  Script AI Antiban is enabled at startup. Tested: idle close/reset/once semantics
+  (`FlipTaskTest`), fidget scheduling (`HumanizedIdleTest`); fidget actions themselves are
+  SDK-coupled → verify visually at next live run.
+- **Buy priority**: `FlipConfig.minDeploymentGp` (sidebar field; fresh default 1,000 gp,
+  restored old configs get 0) keeps trivial buys from wasting slots, and the engine now
+  **evicts the weakest live buy** (smallest remaining commitment, one per tick) when stock
+  is waiting to sell with no free slot — this closes the 25-minute amulet-wait finding.
+
+## Known Issues / Tech Debt
 - **Members stock bought before disabling the filter** would still be offered for sale on
   F2P (the sell pass doesn't check membership) — the placement fails and backs off, so
   it's churn-bounded, but the capital stays stuck. Edge case; note for the engine.

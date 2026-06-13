@@ -30,6 +30,7 @@ class StateMapperTest {
                 .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
                 .membersItemsAllowed(false)
+                .minDeploymentGp(1_000L)
                 .build();
     }
 
@@ -50,6 +51,7 @@ class StateMapperTest {
         assertEquals(3, restored.maxSlots());
         assertEquals(Duration.ofMinutes(30), restored.maxOfferAge());
         assertEquals(false, restored.membersItemsAllowed());
+        assertEquals(1_000L, restored.minDeploymentGp());
     }
 
     @Test

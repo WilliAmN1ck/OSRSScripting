@@ -7,6 +7,7 @@ import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.humanize.DelayDistribution;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.persistence.PersistedState;
@@ -21,10 +22,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.tribot.automation.TribotScript;
 import org.tribot.automation.script.ScriptContext;
+import org.tribot.script.sdk.antiban.Antiban;
 import org.tribot.script.sdk.util.ScriptSettings;
 
 /**
@@ -45,6 +48,8 @@ public final class GeFlipperScript implements TribotScript {
     private static final String STATE_FILE = "ge-flipper-state.json";
     private static final long TICK_INTERVAL_MS = 2_000L;
     private static final Duration PLACEMENT_RETRY_BACKOFF = Duration.ofSeconds(10);
+    private static final long FIDGET_MIN_MS = 15_000L;
+    private static final long FIDGET_MAX_MS = 45_000L;
 
     @Override
     public void execute(ScriptContext context) {
@@ -77,10 +82,17 @@ public final class GeFlipperScript implements TribotScript {
         FlipperPanel panel = new FlipperPanel(config.get(), config::set);
         context.getSidebar().addSidebarTab(TAB_NAME, null, panel);
 
+        // Echo's built-in action humanization, plus our own idle fidgets while slots sit full.
+        Antiban.setScriptAiAntibanEnabled(true);
+        Random random = new Random();
+        IdleBehavior idle = new HumanizedIdle(
+                new DelayDistribution(FIDGET_MIN_MS, FIDGET_MAX_MS, random),
+                new SdkFidget(context, random));
+
         List<Task> tasks = List.of(
                 new BreakIdleTask(new SdkBreakSource(context.getSidecars())),
                 new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                        config::get, executor, persister, PLACEMENT_RETRY_BACKOFF));
+                        config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle));
         TaskRunner runner = new TaskRunner(tasks);
 
         Instant startedAt = Instant.now();
@@ -134,6 +146,7 @@ public final class GeFlipperScript implements TribotScript {
                 .minMarginGp(5L)
                 .minMarginPct(0.01)
                 .minVolume(1_000L)
+                .minDeploymentGp(1_000L)
                 .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
                 .build();

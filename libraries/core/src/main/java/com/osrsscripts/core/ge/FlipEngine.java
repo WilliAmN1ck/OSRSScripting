@@ -34,6 +34,7 @@ public final class FlipEngine {
         List<FlipAction> actions = new ArrayList<>();
         Deque<Integer> freeSlots = new ArrayDeque<>();
         Set<Integer> busyItems = new HashSet<>();
+        List<GeOffer> liveBuys = new ArrayList<>();
         long committedInBuys = 0L;
         int keptLive = 0;
 
@@ -55,6 +56,7 @@ public final class FlipEngine {
                     keptLive++;
                     if (offer.side() == OfferSide.BUY) {
                         committedInBuys += offer.pricePerItem() * offer.quantity();
+                        liveBuys.add(offer);
                     }
                 }
             }
@@ -62,21 +64,33 @@ public final class FlipEngine {
 
         int capacity = config.maxSlots() - keptLive;
 
-        // Pass 2: sell owned stock.
+        // Pass 2: sell owned stock; sells outrank buys for slots, so when none is available the
+        // weakest live buy (smallest remaining commitment) is evicted to free one next tick.
+        boolean sellBlocked = false;
         for (Map.Entry<Integer, Integer> entry : account.stock().entrySet()) {
-            if (capacity <= 0 || freeSlots.isEmpty()) {
-                break;
-            }
             int itemId = entry.getKey();
             int qty = entry.getValue();
             PricePoint price = prices.get(itemId);
             if (qty <= 0 || price == null || !price.hasHigh()) {
                 continue;
             }
+            if (capacity <= 0 || freeSlots.isEmpty()) {
+                sellBlocked = true;
+                break;
+            }
             int slot = freeSlots.poll();
             actions.add(FlipAction.placeSell(slot, itemId, price.high(), qty));
             busyItems.add(itemId);
             capacity--;
+        }
+        if (sellBlocked && !liveBuys.isEmpty()) {
+            GeOffer weakest = liveBuys.get(0);
+            for (GeOffer buy : liveBuys) {
+                if (remainingCommitment(buy) < remainingCommitment(weakest)) {
+                    weakest = buy;
+                }
+            }
+            actions.add(FlipAction.cancel(weakest.slot()));
         }
 
         // Pass 3: buy the best candidates within capital, per-item and buy-limit constraints.
@@ -100,6 +114,9 @@ public final class FlipEngine {
             if (qty <= 0) {
                 continue;
             }
+            if (qty * buyPrice < config.minDeploymentGp()) {
+                continue; // not worth a slot: leftover slivers block pending sells
+            }
             int slot = freeSlots.poll();
             actions.add(FlipAction.placeBuy(slot, itemId, buyPrice, (int) qty));
             busyItems.add(itemId);
@@ -112,5 +129,10 @@ public final class FlipEngine {
 
     private static boolean isStale(Instant placedAt, Instant now, Duration maxAge) {
         return placedAt != null && Duration.between(placedAt, now).compareTo(maxAge) > 0;
+    }
+
+    /** Gp still committed to the unfilled remainder of a live buy offer. */
+    private static long remainingCommitment(GeOffer buy) {
+        return buy.pricePerItem() * (buy.quantity() - buy.filled());
     }
 }

@@ -18,6 +18,7 @@ public final class PersistedConfig {
     private final int maxSlots;
     private final long maxOfferAgeMinutes;
     private final boolean membersItemsAllowed;
+    private final long minDeploymentGp;
 
     @JsonCreator
     public PersistedConfig(@JsonProperty("capitalCap") long capitalCap,
@@ -27,7 +28,8 @@ public final class PersistedConfig {
                            @JsonProperty("minVolume") long minVolume,
                            @JsonProperty("maxSlots") int maxSlots,
                            @JsonProperty("maxOfferAgeMinutes") long maxOfferAgeMinutes,
-                           @JsonProperty("membersItemsAllowed") boolean membersItemsAllowed) {
+                           @JsonProperty("membersItemsAllowed") boolean membersItemsAllowed,
+                           @JsonProperty("minDeploymentGp") long minDeploymentGp) {
         this.capitalCap = capitalCap;
         this.perItemCapitalCap = perItemCapitalCap;
         this.minMarginGp = minMarginGp;
@@ -36,6 +38,7 @@ public final class PersistedConfig {
         this.maxSlots = maxSlots;
         this.maxOfferAgeMinutes = maxOfferAgeMinutes;
         this.membersItemsAllowed = membersItemsAllowed;
+        this.minDeploymentGp = minDeploymentGp;
     }
 
     public long capitalCap() {
@@ -70,6 +73,10 @@ public final class PersistedConfig {
         return membersItemsAllowed;
     }
 
+    public long minDeploymentGp() {
+        return minDeploymentGp;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -86,13 +93,14 @@ public final class PersistedConfig {
                 && minVolume == other.minVolume
                 && maxSlots == other.maxSlots
                 && maxOfferAgeMinutes == other.maxOfferAgeMinutes
-                && membersItemsAllowed == other.membersItemsAllowed;
+                && membersItemsAllowed == other.membersItemsAllowed
+                && minDeploymentGp == other.minDeploymentGp;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(capitalCap, perItemCapitalCap, minMarginGp, minMarginPct, minVolume,
-                maxSlots, maxOfferAgeMinutes, membersItemsAllowed);
+                maxSlots, maxOfferAgeMinutes, membersItemsAllowed, minDeploymentGp);
     }
 
     @Override
