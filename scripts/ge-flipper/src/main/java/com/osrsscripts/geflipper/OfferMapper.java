@@ -59,10 +59,12 @@ public final class OfferMapper {
 
     /** Assembles a {@link GeOffer} from SDK-extracted primitives ({@code placedAt} is unavailable). */
     public static GeOffer toGeOffer(int slot, String statusName, String typeName, int itemId,
-                                    int price, int totalQty, int transferredQty) {
+                                    int price, int totalQty, int transferredQty,
+                                    long transferredGold) {
         OfferStatus status = statusOf(statusName, transferredQty);
         OfferSide side = status == OfferStatus.EMPTY ? null : sideOf(typeName);
-        return new GeOffer(slot, status, side, itemId, price, totalQty, transferredQty, null);
+        return new GeOffer(slot, status, side, itemId, price, totalQty, transferredQty,
+                transferredGold, null);
     }
 
     /** Returns all eight slots in order, filling any slot absent from {@code present} with an empty offer. */

@@ -38,7 +38,7 @@ class FlipTaskTest {
     private final GeTax tax = new GeTax(GeTaxRules.defaults());
     private final BuyLimitLedger ledger = new BuyLimitLedger();
     private final StockLedger stock = new StockLedger();
-    private final OfferTracker tracker = new OfferTracker(ledger, stock, tax);
+    private final OfferTracker tracker = new OfferTracker(ledger, stock);
     private final AtomicReference<FlipConfig> config = new AtomicReference<>(buyingConfig());
     private final List<PersistedState> persisted = new ArrayList<>();
     private final List<Instant> idleTicks = new ArrayList<>();
@@ -204,7 +204,7 @@ class FlipTaskTest {
         client.offers = OfferMapper.fillEightSlots(List.of(live));
 
         // The tracker remembers this offer being placed an hour ago; maxOfferAge is 30 min.
-        tracker.restore(List.of(new OfferTracker.Stamp(1, 100, OfferSide.BUY, 100L, 0,
+        tracker.restore(List.of(new OfferTracker.Stamp(1, 100, OfferSide.BUY, 100L, 0, 0L,
                 Instant.now().minus(Duration.ofHours(1)))), 0L, 0L);
 
         task(new CannedFetcher()).execute();

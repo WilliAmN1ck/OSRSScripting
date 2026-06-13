@@ -49,7 +49,8 @@ public final class SdkGeClient implements GeClient {
                     offer.getItemId(),
                     offer.getPrice(),
                     offer.getTotalQuantity(),
-                    offer.getTransferredItemQuantity()));
+                    offer.getTransferredItemQuantity(),
+                    offer.getTransferredGoldQuantity()));
         }
         return OfferMapper.fillEightSlots(present);
     }

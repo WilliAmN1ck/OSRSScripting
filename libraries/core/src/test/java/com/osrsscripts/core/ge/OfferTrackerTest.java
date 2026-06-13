@@ -7,7 +7,6 @@ import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.OfferSide;
 import com.osrsscripts.core.model.OfferStatus;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,14 +26,18 @@ class OfferTrackerTest {
     void setUp() {
         buyLimits = new BuyLimitLedger();
         stock = new StockLedger();
-        // 2% rate, no exemptions in play above 100 gp.
-        tracker = new OfferTracker(buyLimits, stock,
-                new GeTax(new GeTaxRules(0.02, 5_000_000L, 100L, Collections.emptySet())));
+        tracker = new OfferTracker(buyLimits, stock);
     }
 
+    /** Offer whose transferred gold sits exactly at the listed price. */
     private static GeOffer offer(int slot, OfferStatus status, OfferSide side,
                                  long price, int qty, int filled) {
         return new GeOffer(slot, status, side, ITEM, price, qty, filled, null);
+    }
+
+    private static GeOffer offerWithGold(int slot, OfferStatus status, OfferSide side,
+                                         long price, int qty, int filled, long gold) {
+        return new GeOffer(slot, status, side, ITEM, price, qty, filled, gold, null);
     }
 
     @Test
@@ -106,21 +109,40 @@ class OfferTrackerTest {
     }
 
     @Test
-    void sellFillAccruesTaxAwareProfitAgainstCostBasis() {
+    void sellFillAccruesProfitFromTransferredGoldAgainstCostBasis() {
         stock.recordBuy(ITEM, 10, 100L);
 
         tracker.observe(List.of(offer(1, OfferStatus.ACTIVE, OfferSide.SELL, 150L, 10, 0)), T0);
         tracker.observe(List.of(offer(1, OfferStatus.COMPLETE, OfferSide.SELL, 150L, 10, 10)), T1);
 
-        // 10 * 150 gross - 10 * 3 tax (2% of 150) - 1000 basis = 470.
-        assertEquals(470L, tracker.realizedProfit());
+        // 1500 gold received (at the listed price) - 1000 basis = 500.
+        assertEquals(500L, tracker.realizedProfit());
         assertEquals(1L, tracker.flipsCompleted());
         assertEquals(0, stock.ownedQty(ITEM));
 
         // Re-observing the completed offer changes nothing.
         tracker.observe(List.of(offer(1, OfferStatus.COMPLETE, OfferSide.SELL, 150L, 10, 10)), T2);
-        assertEquals(470L, tracker.realizedProfit());
+        assertEquals(500L, tracker.realizedProfit());
         assertEquals(1L, tracker.flipsCompleted());
+    }
+
+    @Test
+    void betterPriceFillsUseActualGoldMoved() {
+        // Buy listed at 100 x 10 but filled for only 950 gold total.
+        tracker.observe(List.of(
+                offerWithGold(1, OfferStatus.ACTIVE, OfferSide.BUY, 100L, 10, 0, 0L)), T0);
+        tracker.observe(List.of(
+                offerWithGold(1, OfferStatus.COMPLETE, OfferSide.BUY, 100L, 10, 10, 950L)), T1);
+        assertEquals(10, stock.ownedQty(ITEM));
+
+        // Sell listed at 150 x 10 but a buyer paid 1_600 in total.
+        tracker.observe(List.of(
+                offerWithGold(2, OfferStatus.ACTIVE, OfferSide.SELL, 150L, 10, 0, 0L)), T1);
+        tracker.observe(List.of(
+                offerWithGold(2, OfferStatus.COMPLETE, OfferSide.SELL, 150L, 10, 10, 1_600L)), T2);
+
+        // 1600 received - 950 actually spent = 650.
+        assertEquals(650L, tracker.realizedProfit());
     }
 
     @Test
@@ -130,8 +152,8 @@ class OfferTrackerTest {
         tracker.observe(List.of(offer(1, OfferStatus.ACTIVE, OfferSide.SELL, 150L, 10, 0)), T0);
         tracker.observe(List.of(offer(1, OfferStatus.PARTIAL, OfferSide.SELL, 150L, 10, 4)), T1);
 
-        // 4 * 150 - 4 * 3 - 400 basis = 188; not yet a completed flip.
-        assertEquals(188L, tracker.realizedProfit());
+        // 600 received - 400 basis = 200; not yet a completed flip.
+        assertEquals(200L, tracker.realizedProfit());
         assertEquals(0L, tracker.flipsCompleted());
     }
 
@@ -144,8 +166,7 @@ class OfferTrackerTest {
         // Fresh collaborators, as after a script restart.
         StockLedger newStock = new StockLedger();
         newStock.load(stock.lots());
-        OfferTracker restored = new OfferTracker(new BuyLimitLedger(), newStock,
-                new GeTax(new GeTaxRules(0.02, 5_000_000L, 100L, Collections.emptySet())));
+        OfferTracker restored = new OfferTracker(new BuyLimitLedger(), newStock);
         restored.restore(stamps, 470L, 1L);
 
         assertEquals(470L, restored.realizedProfit());
@@ -158,8 +179,7 @@ class OfferTrackerTest {
         assertEquals(4, newStock.ownedQty(ITEM)); // no double count of the pre-restart fill
 
         // A non-matching offer in that slot is treated as brand new.
-        OfferTracker fresh = new OfferTracker(new BuyLimitLedger(), new StockLedger(),
-                new GeTax(GeTaxRules.defaults()));
+        OfferTracker fresh = new OfferTracker(new BuyLimitLedger(), new StockLedger());
         fresh.restore(stamps, 0L, 0L);
         List<GeOffer> mismatch = fresh.observe(
                 List.of(offer(1, OfferStatus.ACTIVE, OfferSide.BUY, 90L, 10, 0)), T2);

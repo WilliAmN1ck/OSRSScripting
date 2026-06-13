@@ -32,7 +32,8 @@ public final class StateMapper {
         List<OfferStampEntry> stampEntries = new ArrayList<>();
         for (OfferTracker.Stamp s : tracker.stamps()) {
             stampEntries.add(new OfferStampEntry(s.slot(), s.itemId(), s.side().name(),
-                    s.pricePerItem(), s.filled(), s.placedAt().toEpochMilli()));
+                    s.pricePerItem(), s.filled(), s.transferredGold(),
+                    s.placedAt().toEpochMilli()));
         }
         PersistedConfig persistedConfig = new PersistedConfig(config.capitalCap(),
                 config.perItemCapitalCap(), config.minMarginGp(), config.minMarginPct(),
@@ -84,8 +85,13 @@ public final class StateMapper {
             } catch (IllegalArgumentException | NullPointerException invalid) {
                 continue; // fail safe: a stamp we cannot read is just re-stamped first-seen
             }
+            // Files written before gold tracking carry no baseline; approximate it from the
+            // listed price so the first observe after upgrade does not re-count old fills.
+            long gold = e.transferredGold() == 0L && e.filled() > 0
+                    ? e.pricePerItem() * e.filled()
+                    : e.transferredGold();
             stamps.add(new OfferTracker.Stamp(e.slot(), e.itemId(), side, e.pricePerItem(),
-                    e.filled(), Instant.ofEpochMilli(e.placedAtEpochMillis())));
+                    e.filled(), gold, Instant.ofEpochMilli(e.placedAtEpochMillis())));
         }
         tracker.restore(stamps, state.realizedProfit(), state.flipsCompleted());
     }

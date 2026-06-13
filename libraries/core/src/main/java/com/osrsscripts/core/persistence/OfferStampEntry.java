@@ -16,6 +16,7 @@ public final class OfferStampEntry {
     private final String side;
     private final long pricePerItem;
     private final int filled;
+    private final long transferredGold;
     private final long placedAtEpochMillis;
 
     @JsonCreator
@@ -24,12 +25,14 @@ public final class OfferStampEntry {
                            @JsonProperty("side") String side,
                            @JsonProperty("pricePerItem") long pricePerItem,
                            @JsonProperty("filled") int filled,
+                           @JsonProperty("transferredGold") long transferredGold,
                            @JsonProperty("placedAtEpochMillis") long placedAtEpochMillis) {
         this.slot = slot;
         this.itemId = itemId;
         this.side = side;
         this.pricePerItem = pricePerItem;
         this.filled = filled;
+        this.transferredGold = transferredGold;
         this.placedAtEpochMillis = placedAtEpochMillis;
     }
 
@@ -53,6 +56,10 @@ public final class OfferStampEntry {
         return filled;
     }
 
+    public long transferredGold() {
+        return transferredGold;
+    }
+
     public long placedAtEpochMillis() {
         return placedAtEpochMillis;
     }
@@ -70,13 +77,15 @@ public final class OfferStampEntry {
                 && itemId == other.itemId
                 && pricePerItem == other.pricePerItem
                 && filled == other.filled
+                && transferredGold == other.transferredGold
                 && placedAtEpochMillis == other.placedAtEpochMillis
                 && Objects.equals(side, other.side);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(slot, itemId, side, pricePerItem, filled, placedAtEpochMillis);
+        return Objects.hash(slot, itemId, side, pricePerItem, filled, transferredGold,
+                placedAtEpochMillis);
     }
 
     @Override

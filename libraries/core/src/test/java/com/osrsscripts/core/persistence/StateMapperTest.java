@@ -38,7 +38,7 @@ class StateMapperTest {
     void configRoundTripsThroughSnapshot() {
         BuyLimitLedger buyLimits = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(buyLimits, stock, new GeTax(GeTaxRules.defaults()));
+        OfferTracker tracker = new OfferTracker(buyLimits, stock);
 
         PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, config());
         FlipConfig restored = StateMapper.restoredConfig(state);
@@ -63,7 +63,7 @@ class StateMapperTest {
     void snapshotAndRestoreRoundTripAllState() {
         BuyLimitLedger buyLimits = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(buyLimits, stock, new GeTax(GeTaxRules.defaults()));
+        OfferTracker tracker = new OfferTracker(buyLimits, stock);
 
         // A partially filled buy observed once: populates all three collaborators.
         tracker.observe(List.of(
@@ -73,8 +73,7 @@ class StateMapperTest {
 
         BuyLimitLedger restoredLimits = new BuyLimitLedger();
         StockLedger restoredStock = new StockLedger();
-        OfferTracker restoredTracker = new OfferTracker(restoredLimits, restoredStock,
-                new GeTax(GeTaxRules.defaults()));
+        OfferTracker restoredTracker = new OfferTracker(restoredLimits, restoredStock);
         StateMapper.restore(state, restoredLimits, restoredStock, restoredTracker);
 
         assertEquals(4, restoredLimits.purchasedWithin(4151, T0));
@@ -92,12 +91,11 @@ class StateMapperTest {
     @Test
     void restoreSkipsStampsWithUnknownSide() {
         PersistedState state = new PersistedState(List.of(), List.of(),
-                List.of(new OfferStampEntry(1, 4151, "JUNK", 100L, 0, T0.toEpochMilli()),
-                        new OfferStampEntry(2, 561, "SELL", 200L, 1, T0.toEpochMilli())),
+                List.of(new OfferStampEntry(1, 4151, "JUNK", 100L, 0, 0L, T0.toEpochMilli()),
+                        new OfferStampEntry(2, 561, "SELL", 200L, 1, 200L, T0.toEpochMilli())),
                 null, 0L, 0L);
 
-        OfferTracker tracker = new OfferTracker(new BuyLimitLedger(), new StockLedger(),
-                new GeTax(GeTaxRules.defaults()));
+        OfferTracker tracker = new OfferTracker(new BuyLimitLedger(), new StockLedger());
         StateMapper.restore(state, new BuyLimitLedger(), new StockLedger(), tracker);
 
         assertEquals(1, tracker.stamps().size());

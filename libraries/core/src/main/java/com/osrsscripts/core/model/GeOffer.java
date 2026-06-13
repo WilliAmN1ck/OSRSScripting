@@ -16,10 +16,12 @@ public final class GeOffer {
     private final long pricePerItem;
     private final int quantity;
     private final int filled;
+    private final long transferredGold;
     private final Instant placedAt;
 
     public GeOffer(int slot, OfferStatus status, OfferSide side, int itemId,
-                   long pricePerItem, int quantity, int filled, Instant placedAt) {
+                   long pricePerItem, int quantity, int filled, long transferredGold,
+                   Instant placedAt) {
         this.slot = slot;
         this.status = Objects.requireNonNull(status, "status");
         this.side = side;
@@ -27,12 +29,20 @@ public final class GeOffer {
         this.pricePerItem = pricePerItem;
         this.quantity = quantity;
         this.filled = filled;
+        this.transferredGold = transferredGold;
         this.placedAt = placedAt;
+    }
+
+    /** Convenience for callers without fill-price data: gold is assumed at the listed price. */
+    public GeOffer(int slot, OfferStatus status, OfferSide side, int itemId,
+                   long pricePerItem, int quantity, int filled, Instant placedAt) {
+        this(slot, status, side, itemId, pricePerItem, quantity, filled,
+                pricePerItem * filled, placedAt);
     }
 
     /** An empty slot. */
     public static GeOffer empty(int slot) {
-        return new GeOffer(slot, OfferStatus.EMPTY, null, 0, 0L, 0, 0, null);
+        return new GeOffer(slot, OfferStatus.EMPTY, null, 0, 0L, 0, 0, 0L, null);
     }
 
     public int slot() {
@@ -61,6 +71,14 @@ public final class GeOffer {
 
     public int filled() {
         return filled;
+    }
+
+    /**
+     * Gold actually moved by fills so far: spent for a buy, received for a sell. The GE can fill
+     * at better prices than listed, so this is the accurate money figure, not {@code price × filled}.
+     */
+    public long transferredGold() {
+        return transferredGold;
     }
 
     public Instant placedAt() {
@@ -95,6 +113,7 @@ public final class GeOffer {
                 && pricePerItem == other.pricePerItem
                 && quantity == other.quantity
                 && filled == other.filled
+                && transferredGold == other.transferredGold
                 && status == other.status
                 && side == other.side
                 && Objects.equals(placedAt, other.placedAt);
@@ -102,7 +121,8 @@ public final class GeOffer {
 
     @Override
     public int hashCode() {
-        return Objects.hash(slot, status, side, itemId, pricePerItem, quantity, filled, placedAt);
+        return Objects.hash(slot, status, side, itemId, pricePerItem, quantity, filled,
+                transferredGold, placedAt);
     }
 
     @Override

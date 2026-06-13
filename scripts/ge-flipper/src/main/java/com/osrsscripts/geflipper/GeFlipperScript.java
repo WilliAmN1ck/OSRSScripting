@@ -60,7 +60,7 @@ public final class GeFlipperScript implements TribotScript {
         GeTax tax = new GeTax(GeTaxRules.defaults());
         BuyLimitLedger ledger = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(ledger, stock, tax);
+        OfferTracker tracker = new OfferTracker(ledger, stock);
         FlipActionExecutor executor = new FlipActionExecutor(client);
 
         Path stateFile = ScriptSettings.getDefault().getDirectory().toPath().resolve(STATE_FILE);
