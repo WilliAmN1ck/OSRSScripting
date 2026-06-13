@@ -69,5 +69,22 @@
 - [x] Capital-aware ranking: FlipScanner now ranks by capital deployed per offer (capped at
       perItemCap), tie-broken by profit/cycle — so a big bankroll buys expensive items instead of
       cheap high-volume flips. Was never implemented before (git-confirmed). 3 new scanner tests.
+      Live-verified: deployed ~1.93M into one slot (Wooden shield (g) @ 92k x21); +58.5k Rune
+      platelegs flip. Config dialed live: Min ROI 0.5%, vol 5, min-spend 500k, offer age 60.
+- [x] UI clarity: relabel per-item cap -> "Max spend per item"; "Min ROI (%)" (now a percent
+      input, type 2 for 2%, stored as fraction); "Min hourly volume (units)"; "Min spend per buy".
+- [x] /code-review max over full PR #9 (5 commits): no correctness bugs. Two non-blocking notes:
+      ranking's deployableUnits caps by volume (intentionally deprioritizes illiquid items);
+      trimNumber rounds displayed % to 4 dp (not practically reachable). PR review-complete.
+- [x] PR #9 merged (535a355); branch deleted, local main synced.
+
+## Docs backfill — branch `docs-backfill` (2026-06-13)
+- [x] Audited all docs/plans + README; found PR #8 and PR #9 had no handoffs, maintenance spec
+      status stale, 3d "Known Issues" listed 3 now-fixed items, no docs/lessons.md.
+- [x] Wrote handoff-tech-debt.md (PR #8) and handoff-slot-utilization.md (PR #9)
+- [x] Maintenance spec.md: status → Complete; added Batch 3 (diagnostics) + Batch 4 (ranking) tables
+- [x] Pruned 3 resolved items from handoff-3d Known Issues (pointer to PR #8 handoff)
+- [x] README: added capital ranking, trade history/auto-avoid, sell-exit, idle advisory
+- [x] Created docs/lessons.md seeded with this session's corrections
 
 ## Phase 4 — Publish / distribution  (later / optional)

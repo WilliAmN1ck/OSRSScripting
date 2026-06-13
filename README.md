@@ -19,6 +19,13 @@ This software is provided for educational purposes only; use at your own risk.
   placement times, and profit persist across restarts in the script-settings
   directory; flipping pauses during client-scheduled breaks.
 
+  Candidates are ranked by the **capital each offer would deploy** (so a large
+  bankroll buys higher-value items, not just cheap high-volume flips), within
+  per-item and total capital caps. A **per-item trade history** auto-avoids
+  recorded losers, and stale sells **escalate to the insta-sell price** after N
+  relists. When GE slots or cash sit idle because of a config setting, the
+  sidebar shows an **advisory naming the setting to adjust**.
+
 ## Build
 
     ./gradlew build                          # compile + test everything
