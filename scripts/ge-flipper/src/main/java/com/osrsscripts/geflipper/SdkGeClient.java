@@ -10,6 +10,7 @@ import org.tribot.script.sdk.Inventory;
 import org.tribot.script.sdk.query.Query;
 import org.tribot.script.sdk.types.GrandExchangeOffer;
 import org.tribot.script.sdk.types.InventoryItem;
+import org.tribot.script.sdk.types.definitions.ItemDefinition;
 
 /**
  * The sole TRiBot Script SDK-backed {@link GeClient}. Every method is thin delegation to the SDK,
@@ -26,6 +27,11 @@ public final class SdkGeClient implements GeClient {
     @Override
     public boolean open() {
         return GrandExchange.open();
+    }
+
+    @Override
+    public boolean close() {
+        return GrandExchange.close();
     }
 
     @Override
@@ -57,7 +63,10 @@ public final class SdkGeClient implements GeClient {
     public Map<Integer, Integer> stock() {
         Map<Integer, Integer> stock = new LinkedHashMap<>();
         for (InventoryItem item : Inventory.getAll()) {
-            int id = item.getId();
+            // GE collection hands stackables over in noted form; canonicalize to the unnoted id
+            // so the engine's world (ledger, wiki prices, sell offers) sees one id per item.
+            ItemDefinition definition = item.getDefinition();
+            int id = definition.isNoted() ? definition.getUnnotedItemId() : item.getId();
             if (id == OfferMapper.COINS_ITEM_ID) {
                 continue;
             }
@@ -80,10 +89,25 @@ public final class SdkGeClient implements GeClient {
     public boolean placeSell(int itemId, int price, int quantity) {
         return GrandExchange.placeOffer(GrandExchange.CreateOfferConfig.builder()
                 .type(GrandExchangeOffer.Type.SELL)
-                .itemId(itemId)
+                .itemId(inventoryIdFor(itemId))
                 .price(price)
                 .quantity(quantity)
                 .build());
+    }
+
+    /**
+     * The engine speaks in canonical (unnoted) ids, but the sell flow must reference the item as
+     * it sits in the inventory — which is the noted form when it came from a GE collection.
+     */
+    private static int inventoryIdFor(int canonicalItemId) {
+        for (InventoryItem item : Inventory.getAll()) {
+            ItemDefinition definition = item.getDefinition();
+            int canonical = definition.isNoted() ? definition.getUnnotedItemId() : item.getId();
+            if (canonical == canonicalItemId) {
+                return item.getId();
+            }
+        }
+        return canonicalItemId;
     }
 
     @Override

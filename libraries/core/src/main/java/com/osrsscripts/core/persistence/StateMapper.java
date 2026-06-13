@@ -3,7 +3,9 @@ package com.osrsscripts.core.persistence;
 import com.osrsscripts.core.ge.BuyLimitLedger;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.OfferSide;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +20,7 @@ public final class StateMapper {
     }
 
     public static PersistedState snapshot(BuyLimitLedger buyLimits, StockLedger stock,
-                                          OfferTracker tracker) {
+                                          OfferTracker tracker, FlipConfig config) {
         List<LedgerEntry> ledgerEntries = new ArrayList<>();
         for (BuyLimitLedger.Purchase p : buyLimits.purchases()) {
             ledgerEntries.add(new LedgerEntry(p.itemId(), p.qty(), p.at().toEpochMilli()));
@@ -32,8 +34,31 @@ public final class StateMapper {
             stampEntries.add(new OfferStampEntry(s.slot(), s.itemId(), s.side().name(),
                     s.pricePerItem(), s.filled(), s.placedAt().toEpochMilli()));
         }
-        return new PersistedState(ledgerEntries, stockEntries, stampEntries,
+        PersistedConfig persistedConfig = new PersistedConfig(config.capitalCap(),
+                config.perItemCapitalCap(), config.minMarginGp(), config.minMarginPct(),
+                config.minVolume(), config.maxSlots(), config.maxOfferAge().toMinutes(),
+                config.membersItemsAllowed(), config.minDeploymentGp());
+        return new PersistedState(ledgerEntries, stockEntries, stampEntries, persistedConfig,
                 tracker.realizedProfit(), tracker.flipsCompleted());
+    }
+
+    /** The persisted run configuration, or {@code null} when the state predates it. */
+    public static FlipConfig restoredConfig(PersistedState state) {
+        PersistedConfig c = state.config();
+        if (c == null) {
+            return null;
+        }
+        return FlipConfig.builder()
+                .capitalCap(c.capitalCap())
+                .perItemCapitalCap(c.perItemCapitalCap())
+                .minMarginGp(c.minMarginGp())
+                .minMarginPct(c.minMarginPct())
+                .minVolume(c.minVolume())
+                .maxSlots(c.maxSlots())
+                .maxOfferAge(Duration.ofMinutes(c.maxOfferAgeMinutes()))
+                .membersItemsAllowed(c.membersItemsAllowed())
+                .minDeploymentGp(c.minDeploymentGp())
+                .build();
     }
 
     public static void restore(PersistedState state, BuyLimitLedger buyLimits, StockLedger stock,

@@ -7,6 +7,7 @@ import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.humanize.DelayDistribution;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.persistence.PersistedState;
@@ -21,16 +22,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.tribot.automation.TribotScript;
 import org.tribot.automation.script.ScriptContext;
+import org.tribot.script.sdk.antiban.Antiban;
 import org.tribot.script.sdk.util.ScriptSettings;
 
 /**
  * Entry point for the Grand Exchange flipper. Each loop drives a {@link TaskRunner} that idles
- * during client-scheduled breaks, opens the GE if needed, then runs one flip tick: observe
- * offers, read the market, decide actions, and execute them against the game client.
+ * during client-scheduled breaks, then runs one flip tick: observe offers, read the market,
+ * decide actions, and execute them against the game client (opening the GE only when a tick
+ * actually has actions to perform).
  *
  * <p>The flipping logic lives in {@code libraries:core}; this class is the composition root that
  * wires it to the TRiBot SDK: {@link SdkGeClient} for the GE, a {@link FlipperPanel} sidebar tab
@@ -43,6 +47,9 @@ public final class GeFlipperScript implements TribotScript {
     private static final String TAB_NAME = "GE Flipper";
     private static final String STATE_FILE = "ge-flipper-state.json";
     private static final long TICK_INTERVAL_MS = 2_000L;
+    private static final Duration PLACEMENT_RETRY_BACKOFF = Duration.ofSeconds(10);
+    private static final long FIDGET_MIN_MS = 15_000L;
+    private static final long FIDGET_MAX_MS = 45_000L;
 
     @Override
     public void execute(ScriptContext context) {
@@ -69,15 +76,23 @@ public final class GeFlipperScript implements TribotScript {
             }
         };
 
-        AtomicReference<FlipConfig> config = new AtomicReference<>(defaultConfig());
+        FlipConfig restoredConfig = StateMapper.restoredConfig(loaded);
+        AtomicReference<FlipConfig> config =
+                new AtomicReference<>(restoredConfig != null ? restoredConfig : defaultConfig());
         FlipperPanel panel = new FlipperPanel(config.get(), config::set);
         context.getSidebar().addSidebarTab(TAB_NAME, null, panel);
 
+        // Echo's built-in action humanization, plus our own idle fidgets while slots sit full.
+        Antiban.setScriptAiAntibanEnabled(true);
+        Random random = new Random();
+        IdleBehavior idle = new HumanizedIdle(
+                new DelayDistribution(FIDGET_MIN_MS, FIDGET_MAX_MS, random),
+                new SdkFidget(context, random));
+
         List<Task> tasks = List.of(
                 new BreakIdleTask(new SdkBreakSource(context.getSidecars())),
-                new EnsureGeOpenTask(client),
                 new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                        config::get, executor, persister));
+                        config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle));
         TaskRunner runner = new TaskRunner(tasks);
 
         Instant startedAt = Instant.now();
@@ -89,7 +104,7 @@ public final class GeFlipperScript implements TribotScript {
             }
         } finally {
             // Save first: a failure tearing down the sidebar must not cost us the final state.
-            persister.accept(StateMapper.snapshot(ledger, stock, tracker));
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, config.get()));
             context.getSidebar().removeSidebarTab(TAB_NAME);
         }
     }
@@ -119,15 +134,20 @@ public final class GeFlipperScript implements TribotScript {
         }
     }
 
-    /** Initial run parameters; the sidebar panel replaces them live once edited. */
+    /**
+     * First-run parameters, used only when no persisted config exists. {@code capitalCap = 0}
+     * disables buying, so a fresh install idles until the user sets a capital cap in the sidebar
+     * — it must never start trading (or hunting members items on an F2P world) on guesses.
+     */
     private static FlipConfig defaultConfig() {
         return FlipConfig.builder()
-                .capitalCap(1_000_000L)
+                .capitalCap(0L)
                 .perItemCapitalCap(250_000L)
                 .minMarginGp(5L)
                 .minMarginPct(0.01)
                 .minVolume(1_000L)
-                .maxSlots(4)
+                .minDeploymentGp(1_000L)
+                .maxSlots(3)
                 .maxOfferAge(Duration.ofMinutes(30))
                 .build();
     }

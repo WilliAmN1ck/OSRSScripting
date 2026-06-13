@@ -41,12 +41,18 @@ class FlipTaskTest {
     private final OfferTracker tracker = new OfferTracker(ledger, stock, tax);
     private final AtomicReference<FlipConfig> config = new AtomicReference<>(buyingConfig());
     private final List<PersistedState> persisted = new ArrayList<>();
+    private final List<Instant> idleTicks = new ArrayList<>();
 
     private FlipTask task(HttpFetcher fetcher) {
+        return task(fetcher, Duration.ZERO);
+    }
+
+    private FlipTask task(HttpFetcher fetcher, Duration retryBackoff) {
         WikiPriceClient prices = new WikiPriceClient(
                 fetcher, Clock.systemUTC(), BASE_URL, Duration.ofMinutes(5), Duration.ofHours(6));
         return new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                config::get, new FlipActionExecutor(client), persisted::add);
+                config::get, new FlipActionExecutor(client), persisted::add, retryBackoff,
+                idleTicks::add);
     }
 
     private static FlipConfig buyingConfig() {
@@ -62,13 +68,105 @@ class FlipTaskTest {
     }
 
     @Test
-    void shouldRunFollowsClientOpenState() {
+    void opensTheGeOnlyWhenActionsArePending() {
+        client.open = false;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
         FlipTask task = task(new CannedFetcher());
+        task.execute();
+
+        assertEquals(1, client.openCalls, "pending buy: open the GE first");
+        assertTrue(client.buys.isEmpty(), "placement waits until the GE is open");
 
         client.open = true;
-        assertTrue(task.shouldRun());
+        task.execute();
+        assertEquals(1, client.buys.size(), "next tick places through the open GE");
+    }
+
+    @Test
+    void idleTickNeverTouchesTheGe() {
         client.open = false;
-        assertFalse(task.shouldRun());
+        client.coins = 0L; // nothing affordable, nothing owned: no actions
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        task(new CannedFetcher()).execute();
+
+        assertEquals(0, client.openCalls, "no work, no interface churn");
+        assertEquals(1, idleTicks.size(), "idle behavior gets the tick");
+    }
+
+    @Test
+    void sustainedIdleClosesTheGeOnceAndKeepsFidgeting() {
+        client.open = true;
+        client.coins = 0L; // nothing to do while every slot waits
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        FlipTask task = task(new CannedFetcher());
+        for (int i = 0; i < FlipTask.IDLE_TICKS_BEFORE_CLOSE - 1; i++) {
+            task.execute();
+        }
+        assertEquals(0, client.closeCalls, "grace period: interface left alone");
+
+        task.execute(); // 5th consecutive idle tick
+        assertEquals(1, client.closeCalls, "sustained idle closes the GE");
+
+        task.execute(); // already closed: no churn
+        assertEquals(1, client.closeCalls);
+        assertEquals(FlipTask.IDLE_TICKS_BEFORE_CLOSE + 1, idleTicks.size());
+    }
+
+    @Test
+    void actionTickResetsTheIdleCountdown() {
+        client.open = true;
+        client.coins = 0L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        FlipTask task = task(new CannedFetcher());
+        for (int i = 0; i < FlipTask.IDLE_TICKS_BEFORE_CLOSE - 1; i++) {
+            task.execute();
+        }
+
+        client.coins = 1_000L; // a buy becomes possible: not idle any more
+        task.execute();
+        assertEquals(1, client.buys.size());
+
+        client.coins = 0L;
+        client.offers = OfferMapper.fillEightSlots(List.of()); // ignore the new offer for the test
+        task.execute(); // idle again, but the countdown restarted
+        assertEquals(0, client.closeCalls);
+    }
+
+    @Test
+    void failedGeOpenBacksOffInsteadOfRetryingEveryTick() {
+        client.open = false;
+        client.opensSucceed = false;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+
+        FlipTask task = task(new CannedFetcher(), Duration.ofHours(1));
+        task.execute();
+        assertEquals(1, client.openCalls);
+
+        task.execute();
+        assertEquals(1, client.openCalls, "backoff: no immediate open retry");
+    }
+
+    @Test
+    void failedPlacementBacksOffInsteadOfFlapping() {
+        client.open = true;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        client.placementsSucceed = false;
+
+        FlipTask task = task(new CannedFetcher(), Duration.ofHours(1));
+        task.execute();
+        assertEquals(1, client.buys.size());
+        assertEquals(1, client.closeCalls, "failed placement resets the interface");
+
+        task.execute();
+        assertEquals(1, client.buys.size(), "backoff: no immediate retry");
+        assertEquals(1, client.closeCalls);
     }
 
     @Test

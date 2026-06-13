@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
@@ -35,6 +36,7 @@ public final class FlipperPanel extends JPanel {
         MIN_MARGIN_GP("Min margin (gp)"),
         MIN_MARGIN_PCT("Min margin (fraction)"),
         MIN_VOLUME("Min volume (units/h)"),
+        MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
         MAX_OFFER_AGE_MINUTES("Max offer age (minutes)");
 
@@ -46,6 +48,7 @@ public final class FlipperPanel extends JPanel {
     }
 
     private final Map<Field, JTextField> fields = new EnumMap<>(Field.class);
+    private final JCheckBox membersCheckBox = new JCheckBox("Buy members items");
     private final JButton applyButton = new JButton("Apply");
     private final JLabel errorLabel = new JLabel(" ");
     private final JTextArea statsArea = new JTextArea(12, 24);
@@ -83,8 +86,11 @@ public final class FlipperPanel extends JPanel {
         c.gridy = row;
         c.gridwidth = 2;
         c.weightx = 1;
-        section.add(applyButton, c);
+        membersCheckBox.setSelected(initial.membersItemsAllowed());
+        section.add(membersCheckBox, c);
         c.gridy = row + 1;
+        section.add(applyButton, c);
+        c.gridy = row + 2;
         errorLabel.setForeground(new Color(0xB00020));
         section.add(errorLabel, c);
         return section;
@@ -111,6 +117,8 @@ public final class FlipperPanel extends JPanel {
                 return Double.toString(config.minMarginPct());
             case MIN_VOLUME:
                 return Long.toString(config.minVolume());
+            case MIN_DEPLOYMENT_GP:
+                return Long.toString(config.minDeploymentGp());
             case MAX_SLOTS:
                 return Integer.toString(config.maxSlots());
             case MAX_OFFER_AGE_MINUTES:
@@ -146,8 +154,10 @@ public final class FlipperPanel extends JPanel {
                 .minMarginGp(parseLong(Field.MIN_MARGIN_GP, 0))
                 .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT))
                 .minVolume(parseLong(Field.MIN_VOLUME, 0))
+                .minDeploymentGp(parseLong(Field.MIN_DEPLOYMENT_GP, 0))
                 .maxSlots(maxSlots)
                 .maxOfferAge(Duration.ofMinutes(maxOfferAgeMinutes))
+                .membersItemsAllowed(membersCheckBox.isSelected())
                 .build();
     }
 
@@ -208,6 +218,10 @@ public final class FlipperPanel extends JPanel {
 
     void setField(Field field, String text) {
         fields.get(field).setText(text);
+    }
+
+    void setMembersAllowed(boolean allowed) {
+        membersCheckBox.setSelected(allowed);
     }
 
     void clickApply() {

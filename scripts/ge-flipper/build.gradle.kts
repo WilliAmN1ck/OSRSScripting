@@ -47,3 +47,10 @@ tasks.test {
 tasks.matching { it.name == "fatJar" }.configureEach {
     dependsOn(":libraries:core:jar")
 }
+
+// The plugin's fatJar writes ge-flipper.jar — the plain jar task's default name. If jar runs
+// after fatJar in the same invocation it silently clobbers the deployable fat artifact with the
+// thin module jar (observed live: NoClassDefFoundError in Echo). A classifier keeps them apart.
+tasks.jar {
+    archiveClassifier.set("thin")
+}

@@ -10,11 +10,16 @@ import java.util.Map;
 final class FakeGeClient implements GeClient {
 
     boolean open = true;
+    boolean opensSucceed = true;
+    boolean placementsSucceed = true;
+    boolean abortsSucceed = true;
+    boolean collectsSucceed = true;
     long coins;
     List<GeOffer> offers = new ArrayList<>();
     Map<Integer, Integer> stock = new LinkedHashMap<>();
 
     int openCalls;
+    int closeCalls;
     int collectCalls;
     final List<int[]> buys = new ArrayList<>();   // {itemId, price, quantity}
     final List<int[]> sells = new ArrayList<>();   // {itemId, price, quantity}
@@ -28,8 +33,8 @@ final class FakeGeClient implements GeClient {
     @Override
     public boolean open() {
         openCalls++;
-        open = true;
-        return true;
+        open = opensSucceed;
+        return opensSucceed;
     }
 
     @Override
@@ -50,24 +55,31 @@ final class FakeGeClient implements GeClient {
     @Override
     public boolean placeBuy(int itemId, int price, int quantity) {
         buys.add(new int[] {itemId, price, quantity});
-        return true;
+        return placementsSucceed;
     }
 
     @Override
     public boolean placeSell(int itemId, int price, int quantity) {
         sells.add(new int[] {itemId, price, quantity});
+        return placementsSucceed;
+    }
+
+    @Override
+    public boolean close() {
+        closeCalls++;
+        open = false;
         return true;
     }
 
     @Override
     public boolean abort(int slot) {
         aborts.add(slot);
-        return true;
+        return abortsSucceed;
     }
 
     @Override
     public boolean collect() {
         collectCalls++;
-        return true;
+        return collectsSucceed;
     }
 }

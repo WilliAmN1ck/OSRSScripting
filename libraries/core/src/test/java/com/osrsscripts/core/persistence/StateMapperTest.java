@@ -7,9 +7,11 @@ import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.OfferSide;
 import com.osrsscripts.core.model.OfferStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,45 @@ import org.junit.jupiter.api.Test;
 class StateMapperTest {
 
     private static final Instant T0 = Instant.parse("2026-06-12T10:00:00Z");
+
+    private static FlipConfig config() {
+        return FlipConfig.builder()
+                .capitalCap(116_000L)
+                .perItemCapitalCap(25_000L)
+                .minMarginGp(2L)
+                .minMarginPct(0.01)
+                .minVolume(5_000L)
+                .maxSlots(3)
+                .maxOfferAge(Duration.ofMinutes(30))
+                .membersItemsAllowed(false)
+                .minDeploymentGp(1_000L)
+                .build();
+    }
+
+    @Test
+    void configRoundTripsThroughSnapshot() {
+        BuyLimitLedger buyLimits = new BuyLimitLedger();
+        StockLedger stock = new StockLedger();
+        OfferTracker tracker = new OfferTracker(buyLimits, stock, new GeTax(GeTaxRules.defaults()));
+
+        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, config());
+        FlipConfig restored = StateMapper.restoredConfig(state);
+
+        assertEquals(116_000L, restored.capitalCap());
+        assertEquals(25_000L, restored.perItemCapitalCap());
+        assertEquals(2L, restored.minMarginGp());
+        assertEquals(0.01, restored.minMarginPct());
+        assertEquals(5_000L, restored.minVolume());
+        assertEquals(3, restored.maxSlots());
+        assertEquals(Duration.ofMinutes(30), restored.maxOfferAge());
+        assertEquals(false, restored.membersItemsAllowed());
+        assertEquals(1_000L, restored.minDeploymentGp());
+    }
+
+    @Test
+    void missingConfigRestoresNull() {
+        assertEquals(null, StateMapper.restoredConfig(PersistedState.empty()));
+    }
 
     @Test
     void snapshotAndRestoreRoundTripAllState() {
@@ -28,7 +69,7 @@ class StateMapperTest {
         tracker.observe(List.of(
                 new GeOffer(1, OfferStatus.PARTIAL, OfferSide.BUY, 4151, 100L, 10, 4, null)), T0);
 
-        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker);
+        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, config());
 
         BuyLimitLedger restoredLimits = new BuyLimitLedger();
         StockLedger restoredStock = new StockLedger();
@@ -53,7 +94,7 @@ class StateMapperTest {
         PersistedState state = new PersistedState(List.of(), List.of(),
                 List.of(new OfferStampEntry(1, 4151, "JUNK", 100L, 0, T0.toEpochMilli()),
                         new OfferStampEntry(2, 561, "SELL", 200L, 1, T0.toEpochMilli())),
-                0L, 0L);
+                null, 0L, 0L);
 
         OfferTracker tracker = new OfferTracker(new BuyLimitLedger(), new StockLedger(),
                 new GeTax(GeTaxRules.defaults()));

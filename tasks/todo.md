@@ -39,6 +39,10 @@
   - [x] 3c.5 Break guard (BreakSource port, BreakIdleTask, SdkBreakSource) — 2 tests green
   - [x] 3c.6 FlipperPanel (Swing) + StatsSnapshot + GeFlipperScript composition root (ScriptSettings dir, load/save, sidebar tab, break sidecar); fixed fatJar↔core:jar missing task dependency
   - [x] 3c.7 Full verification green; /code-review max (3 findings fixed w/ regression tests); README updated; handoff written (docs/plans/phase-3-ge-flipper/handoff-3c-config-persistence.md); PR open
-- [ ] 3d Validation-first: load/run trivial script in Echo
+- [ ] 3d Live verification — branch `phase-3d-live-verification`; spec + plan approved
+  - [x] 3d.1 F2P filter (FlipConfig.membersItemsAllowed + scanner + panel checkbox) — tests green
+  - [x] 3d.2 Live checklist written (docs/plans/phase-3-ge-flipper/checklist-3d.md)
+  - [x] 3d.3 Live session — ALL 5 gate items passed; 18 flips / ~2.4k gp autonomous soak; 7 live defects fixed at root (noted items, config persistence, GE wedge, jar clobbering, interface flapping, abort/collect/open backoff)
+  - [x] 3d.4 Handoff (docs/plans/phase-3-ge-flipper/handoff-3d-live-verification.md) + PR; items 2 (CLI) + 7 (breaks) deferred
 - Reference: docs/reference/tribot-sdk.md ; handoff: docs/plans/phase-3-ge-flipper/handoff.md
 ## Phase 4 — Publish / distribution  (later / optional)
