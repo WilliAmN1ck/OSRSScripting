@@ -56,7 +56,6 @@ internal class ChopAndBankTask(
                 Log.warn("No tree reachable and no chop spot remembered — start at the trees.")
                 return
             }
-            Log.info("No tree reachable here — walking back to the chop spot $spot")
             if (!Walker.walkTo(spot)) {
                 Log.warn("Walk back to the chop spot did not complete (walker returned false).")
             }
