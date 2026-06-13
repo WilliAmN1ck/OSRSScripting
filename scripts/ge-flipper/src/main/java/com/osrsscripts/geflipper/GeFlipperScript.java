@@ -9,6 +9,7 @@ import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.ge.TradeHistory;
+import com.osrsscripts.core.humanize.AfkScheduler;
 import com.osrsscripts.core.humanize.DelayDistribution;
 import com.osrsscripts.core.humanize.FatigueScaler;
 import com.osrsscripts.core.humanize.FidgetSelector;
@@ -28,6 +29,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,12 +55,19 @@ public final class GeFlipperScript implements TribotScript {
     private static final String USER_AGENT = "osrs-scripts-suite/ge-flipper";
     private static final String TAB_NAME = "GE Flipper";
     private static final String STATE_FILE = "ge-flipper-state.json";
-    private static final long TICK_INTERVAL_MS = 2_000L;
     private static final Duration PLACEMENT_RETRY_BACKOFF = Duration.ofSeconds(10);
     private static final long FIDGET_MIN_MS = 15_000L;
     private static final long FIDGET_MAX_MS = 45_000L;
     private static final Duration FATIGUE_RAMP = Duration.ofHours(3);
     private static final double FATIGUE_MAX = 1.6;
+    private static final long CADENCE_MIN_MS = 1_500L;
+    private static final long CADENCE_MAX_MS = 3_500L;
+    private static final long REACTION_MIN_MS = 200L;
+    private static final long REACTION_MAX_MS = 800L;
+    private static final Duration AFK_MIN_GAP = Duration.ofMinutes(12);
+    private static final Duration AFK_MAX_GAP = Duration.ofMinutes(24);
+    private static final Duration AFK_MIN = Duration.ofSeconds(20);
+    private static final Duration AFK_MAX = Duration.ofSeconds(90);
 
     @Override
     public void execute(ScriptContext context) {
@@ -71,7 +80,6 @@ public final class GeFlipperScript implements TribotScript {
         StockLedger stock = new StockLedger();
         TradeHistory history = new TradeHistory();
         OfferTracker tracker = new OfferTracker(ledger, stock, history);
-        FlipActionExecutor executor = new FlipActionExecutor(client);
 
         Path stateFile = ScriptSettings.getDefault().getDirectory().toPath().resolve(STATE_FILE);
         StateStore store = new StateStore(stateFile);
@@ -104,6 +112,16 @@ public final class GeFlipperScript implements TribotScript {
                 new DelayDistribution(FIDGET_MIN_MS, FIDGET_MAX_MS, random),
                 new FidgetSelector(random), fatigue, fidget::run);
 
+        // A short, fatigue-scaled human pause before each batch of GE actions.
+        DelayDistribution reactionDelay = new DelayDistribution(REACTION_MIN_MS, REACTION_MAX_MS,
+                random);
+        FlipActionExecutor executor = new FlipActionExecutor(client, () -> context.getWaiting()
+                .sleep(Math.round(reactionDelay.nextMs() * fatigue.multiplierAt(Instant.now()))));
+        // Varied loop cadence and occasional look-away AFKs (distinct from client breaks).
+        DelayDistribution cadence = new DelayDistribution(CADENCE_MIN_MS, CADENCE_MAX_MS, random);
+        AfkScheduler afk = new AfkScheduler(startedAt, random, AFK_MIN_GAP, AFK_MAX_GAP, AFK_MIN,
+                AFK_MAX);
+
         FlipTask flipTask = new FlipTask(client, prices, scanner, engine, tax, ledger, stock,
                 tracker, history, config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle,
                 clearHistoryRequest);
@@ -114,10 +132,16 @@ public final class GeFlipperScript implements TribotScript {
 
         try {
             while (!Thread.currentThread().isInterrupted()) {
+                Instant now = Instant.now();
+                Optional<Duration> lookAway = afk.pollAt(now);
+                if (lookAway.isPresent()) {
+                    context.getWaiting().sleep(lookAway.get().toMillis()); // attention wandered
+                    continue;
+                }
                 runner.tick();
                 refreshStats(panel, client, tracker, history, prices, profitBaseline, startedAt,
                         context, flipTask.idleReason());
-                context.getWaiting().sleep(TICK_INTERVAL_MS);
+                context.getWaiting().sleep(Math.round(cadence.nextMs() * fatigue.multiplierAt(now)));
             }
         } finally {
             // Save first: a failure tearing down the sidebar must not cost us the final state.

@@ -46,11 +46,11 @@ actions in the script (verified in the live soak, not unit-tested). Nothing may 
   it stays unit-testable.
   *Verify:* `FlipTaskTest` — the sleeper is invoked before acting; zero-delay sleeper keeps existing
   assertions green.
-- **C3 Active-flip fidget.** After a tick's actions complete and only at a **GE-safe** point, a small
-  probability fires one fidget via `HumanizedIdle.maybeFidgetNow`. Never mid-placement; never touches
-  the open GE while offers are being set up.
-  *Verify:* `FlipTaskTest` — fidget hook invoked only on safe acted-ticks, never when a placement is
-  pending.
+- **C3 Active-flip fidget. — DEFERRED.** Rationale: in a flip cycle the *waits for fills are already
+  idle ticks* (no actions), so the now-richer idle fidgets cover the natural waits. The only window
+  C3 would add to is the brief active bursts while the GE is open — exactly where a fidget carries
+  misclick/interface risk. Deferred until the live soak proves the fidget actions are safe in-game;
+  then a conservative version (camera / mouse-drift only) can be added. Noted, not silently dropped.
 - **C4 Spontaneous AFK.** Wire `AfkScheduler` into the loop: when it returns a duration, the loop
   stops acting and idles (fidgets allowed) until it elapses — distinct from the break sidecar.
   *Verify:* `FlipTaskTest` / loop test — no flip actions issued during an AFK window; resumes after.

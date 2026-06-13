@@ -92,9 +92,13 @@
 - [x] Phase A — core schedulers (TDD): FidgetType + FidgetSelector (weighted, no-repeat),
       FatigueScaler (delay multiplier ramps over session), AfkScheduler (20-90s look-aways,
       a few/hour, min gap). All green.
-- [ ] Phase B — SDK fidget actions: extend SdkFidget to FidgetType repertoire; HumanizedIdle uses
-      selector + fatigue
-- [ ] Phase C — integrate cadence (1.5-3.5s x fatigue), reaction beat, active-flip fidget, AFK
-- [ ] Phase D — verify (suite + fatJar + /code-review), live soak, handoff
+- [x] Phase B — SdkFidget.run(FidgetType): camera/tab-glance-return/mouse-drift (drift via SDK).
+      HumanizedIdle uses selector + fatigue. Deviation: SDK has no world-map/no-click-hover →
+      dropped WORLD_MAP/HOVER (3 fidgets, up from 2).
+- [x] Phase C — cadence (1.5-3.5s x fatigue) + AFK poll in loop; reaction beat in executor (C2).
+      C3 active-flip fidget DEFERRED (idle path already covers the waits; GE-open fidget risk →
+      validate fidgets live first).
+- [ ] Phase D — /code-review, live soak (fidgets fire, an AFK, clean breaks, zero disrupted flips),
+      handoff + PR
 
 ## Phase 4 — Publish / distribution  (later / optional)
