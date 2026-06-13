@@ -87,4 +87,14 @@
 - [x] README: added capital ranking, trade history/auto-avoid, sell-exit, idle advisory
 - [x] Created docs/lessons.md seeded with this session's corrections
 
+## Antiban upgrade (Moderate) — branch `antiban-upgrade` (2026-06-13)
+- spec + plan approved (docs/plans/antiban-upgrade/); breaks already set up by user
+- [x] Phase A — core schedulers (TDD): FidgetType + FidgetSelector (weighted, no-repeat),
+      FatigueScaler (delay multiplier ramps over session), AfkScheduler (20-90s look-aways,
+      a few/hour, min gap). All green.
+- [ ] Phase B — SDK fidget actions: extend SdkFidget to FidgetType repertoire; HumanizedIdle uses
+      selector + fatigue
+- [ ] Phase C — integrate cadence (1.5-3.5s x fatigue), reaction beat, active-flip fidget, AFK
+- [ ] Phase D — verify (suite + fatJar + /code-review), live soak, handoff
+
 ## Phase 4 — Publish / distribution  (later / optional)
