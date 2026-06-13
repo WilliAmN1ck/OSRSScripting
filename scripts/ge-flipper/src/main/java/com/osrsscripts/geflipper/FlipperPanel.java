@@ -88,18 +88,21 @@ public final class FlipperPanel extends JPanel {
         c.insets = new Insets(2, 4, 2, 4);
         c.fill = GridBagConstraints.HORIZONTAL;
 
+        // The RuneLite sidebar is a fixed, narrow column, so label-beside-field squeezes the input
+        // to an unreadable sliver. Stack the label above a full-width field so the typed numbers
+        // are always visible.
         int row = 0;
         for (Field field : Field.values()) {
             JTextField input = new JTextField(initialValue(field, initial), 10);
             fields.put(field, input);
             c.gridx = 0;
             c.gridy = row;
-            c.weightx = 0;
-            section.add(new JLabel(field.label), c);
-            c.gridx = 1;
+            c.gridwidth = 2;
             c.weightx = 1;
+            section.add(new JLabel(field.label), c);
+            c.gridy = row + 1;
             section.add(input, c);
-            row++;
+            row += 2;
         }
         c.gridx = 0;
         c.gridy = row;
