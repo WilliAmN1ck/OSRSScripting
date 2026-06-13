@@ -219,6 +219,10 @@
 - [x] Review-driven (do-it-all): build-complete stop; Watchdog wired (no WC XP for 5 min → stop);
       SdkGameView explicit Skill→SDK map; MainBacklogTask non-BuilderTask guard; antiban parity via
       pure core.humanize (fatigue cadence + look-away AFK). 30 tests green.
+- [x] Edge-case review: FIXED critical watchdog false-stop after breaks (reset on break/logout) +
+      widened stall window to 10 min; "nothing runnable" now a single periodic status line (#4). 31 tests.
+- [ ] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check; bank PIN handling;
+      random-event / non-break-logout (login handler) behaviour.
 - [ ] Deferred (need client / extraction): SDK fidgets (need sdk-support SdkFidget extraction);
       persistence resume wiring + paint/stats (need live verify); MiniBreaks.
 
