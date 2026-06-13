@@ -183,7 +183,7 @@ class FlipTaskTest {
         task(new CannedFetcher()).execute();
 
         assertEquals(1, client.buys.size(), "one buy offer placed");
-        assertArrayEquals(new int[] {100, 100, 10}, client.buys.get(0));
+        assertArrayEquals(new int[] {100, 105, 9}, client.buys.get(0)); // live low 100 + 5% bid-up
         assertTrue(client.sells.isEmpty());
     }
 
@@ -216,7 +216,7 @@ class FlipTaskTest {
         }).execute();
 
         assertEquals(1, client.buys.size(), "a 5m outage must not stop flipping");
-        assertArrayEquals(new int[] {100, 100, 10}, client.buys.get(0));
+        assertArrayEquals(new int[] {100, 105, 9}, client.buys.get(0)); // live low 100 + 5% bid-up
     }
 
     @Test
@@ -381,7 +381,7 @@ class FlipTaskTest {
         clearHistory.set(true); // the sidebar Clear button raises this flag
         task.execute();
         assertEquals(1, client.buys.size(), "a cleared loser gets a fresh start");
-        assertArrayEquals(new int[] {100, 100, 10}, client.buys.get(0));
+        assertArrayEquals(new int[] {100, 105, 9}, client.buys.get(0)); // live low 100 + 5% bid-up
     }
 
     @Test

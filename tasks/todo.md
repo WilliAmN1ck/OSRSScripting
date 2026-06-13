@@ -145,6 +145,13 @@
 - [x] Tests: falling-knife skip, mild-dip no-trip, 5m-fresh margin, /5m parse, 5m-failure degradation. Suite + fatJar green. Reviewed (1 self-finding fixed).
 - [ ] Live soak: skips a clearly falling item, fills slots normally.
 
+## Dynamic bid — branch `dynamic-bid` (2026-06-13)
+- handoff in docs/plans/dynamic-bid/. User picked conservative 5%.
+- [x] FlipScanner: buy placed at live.low + bidUp (bidUp = round(grossMargin x 5%)); filters/ranking
+      gate on net margin (gross - bidUp) so they stay honest; engine sizes qty on the bumped price.
+- [x] Tests: bid-up test (live low + 5%); recomputed tie-break (76x300 == 228x100) + placement +
+      FlipTask buy values [100,105,9]. Suite + fatJar green. Reviewed (0 findings).
+- [ ] Live soak: buys fill faster without a noticeable margin hit (BID_FRACTION is the dial).
 ## Live performance stats — branch `live-stats` (2026-06-13)
 - handoff in docs/plans/live-stats/. Observability for the live run (user picked this + win/loss).
 - [x] StatsSnapshot: openBuyCapital + itemsAvoided fields. GeFlipperScript.refreshStats computes

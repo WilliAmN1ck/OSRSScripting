@@ -99,8 +99,25 @@ class FlipScannerTest {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
 
         FlipCandidate c = scanner.scan(m, p, h, NO_5M, config, tax).get(0);
-        assertEquals(995, c.buyPrice());   // live low, not avg 1000
+        // Buy is the live low (995, not avg 1000) plus the bid-up: gross margin 176, 5% = 9.
+        assertEquals(1004, c.buyPrice());
         assertEquals(1205, c.sellPrice()); // live high, not avg 1200
+    }
+
+    @Test
+    void bidsAboveTheLiveLowByAFractionOfTheMargin() {
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "x", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1100, t, 1000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1100, 1000, 5000, 5000));
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        // Gross margin = 1100 - 1000 - tax(22) = 78; bid-up = round(78 x 5%) = 4.
+        FlipCandidate c = scanner.scan(m, p, h, NO_5M, config, tax).get(0);
+        assertEquals(1004, c.buyPrice(), "live low 1000 + 5% of margin");
+        assertEquals(74L, c.netMarginPerItem(), "margin is reported net of the bid-up");
     }
 
     @Test
@@ -193,18 +210,18 @@ class FlipScannerTest {
 
     @Test
     void breaksGpPerHourTiesTowardMoreCapitalDeployed() {
-        // Both have generous buy limits so the balanced volume sets the rate. gp/hr ties at 22,620
-        // (cheap 78 x 290 == pricey 290 x 78), but the pricier offer deploys more capital
-        // (10000 x 78 = 780k vs 1000 x 290 = 290k), so it wins the tiebreak.
+        // Generous buy limits, so the balanced volume sets the rate. Post bid-up the net margins are
+        // 76 and 228, and gp/hr ties at 22,800 (76 x 300 == 228 x 100). The pricier offer deploys
+        // far more capital (~1.0M vs ~0.3M), so it wins the tiebreak.
         Map<Integer, ItemMeta> m = new HashMap<>();
         m.put(1, new ItemMeta(1, "cheap", false, 4000));
         m.put(2, new ItemMeta(2, "pricey", false, 4000));
         Map<Integer, PricePoint> p = new HashMap<>();
-        p.put(1, new PricePoint(1_100, t, 1_000, t));    // margin 78
-        p.put(2, new PricePoint(10_500, t, 10_000, t));  // margin 290
+        p.put(1, new PricePoint(1_102, t, 1_000, t));     // gross margin 80
+        p.put(2, new PricePoint(10_448, t, 10_000, t));   // gross margin 240
         Map<Integer, MarketStat> h = new HashMap<>();
-        h.put(1, new MarketStat(1_100, 1_000, 290, 290));
-        h.put(2, new MarketStat(10_500, 10_000, 78, 78));
+        h.put(1, new MarketStat(1_102, 1_000, 300, 300));
+        h.put(2, new MarketStat(10_448, 10_000, 100, 100));
         FlipConfig config = FlipConfig.builder()
                 .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
 

@@ -15,8 +15,10 @@ import java.util.Map;
  * prices (insta-sell {@code avgLow} to buy, insta-buy {@code avgHigh} to sell) so a single outlier
  * trade cannot bait a bad item — the fresher five-minute averages when an item is actively trading
  * both sides, else the trailing hour's. Items whose five-minute price has dropped sharply below the
- * hour (a falling knife) are skipped for buying. Offers are still <em>placed</em> at the current
- * {@code /latest} price so they fill at market. Liquidity is the lesser of the two directional
+ * hour (a falling knife) are skipped for buying. Buys are <em>placed</em> just above the current
+ * {@code /latest} low — by a small slice of the margin — so they fill faster at market, with that
+ * bid-up taken off the margin the filters and ranking see. Liquidity is the lesser of the two
+ * directional
  * volumes — a round-trip must fill both a buy and a sell — and candidates are ranked by estimated
  * profit per hour, breaking ties toward the offer that deploys the most capital.
  */
@@ -24,6 +26,12 @@ public final class FlipScanner {
 
     /** A 4-hour buy limit spread over the hours the rate is measured in. */
     private static final double BUY_LIMIT_HOURS = 4.0;
+
+    /** Skip a buy when the 5-minute average has fallen this far below the hour — a falling knife. */
+    private static final double DOWNTREND_DROP = 0.05;
+
+    /** Bid this fraction of an item's margin above the live low, so buys fill a little faster. */
+    private static final double BID_FRACTION = 0.05;
 
     public List<FlipCandidate> scan(Map<Integer, ItemMeta> mapping,
                                     Map<Integer, PricePoint> latest,
@@ -57,7 +65,12 @@ public final class FlipScanner {
                 continue; // no trades on a side: can't price it reliably
             }
 
-            long margin = tax.netMarginPerItem(itemId, avgBuy, avgSell);
+            long grossMargin = tax.netMarginPerItem(itemId, avgBuy, avgSell);
+            // Bid a little above the live low so buys fill faster — a small, self-limiting slice of
+            // the margin, so fat-margin items chase fills harder and thin ones barely move. The
+            // bid-up is real cost, so it comes off the margin the filters and ranking see.
+            long bidUp = grossMargin > 0 ? Math.round(grossMargin * BID_FRACTION) : 0L;
+            long margin = grossMargin - bidUp;
             if (margin < config.minMarginGp()) {
                 continue;
             }
@@ -80,7 +93,7 @@ public final class FlipScanner {
             }
             int buyLimit = meta != null ? meta.buyLimit() : 0;
 
-            candidates.add(new FlipCandidate(itemId, live.low(), live.high(), margin,
+            candidates.add(new FlipCandidate(itemId, live.low() + bidUp, live.high(), margin,
                     balancedVolume, buyLimit, roi));
         }
 
