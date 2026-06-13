@@ -20,6 +20,7 @@ public final class PersistedConfig {
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
     private final int sellExitAfterRelists;
+    private final long avoidAfterLossGp;
 
     @JsonCreator
     public PersistedConfig(@JsonProperty("capitalCap") long capitalCap,
@@ -31,7 +32,8 @@ public final class PersistedConfig {
                            @JsonProperty("maxOfferAgeMinutes") long maxOfferAgeMinutes,
                            @JsonProperty("membersItemsAllowed") boolean membersItemsAllowed,
                            @JsonProperty("minDeploymentGp") long minDeploymentGp,
-                           @JsonProperty("sellExitAfterRelists") int sellExitAfterRelists) {
+                           @JsonProperty("sellExitAfterRelists") int sellExitAfterRelists,
+                           @JsonProperty("avoidAfterLossGp") long avoidAfterLossGp) {
         this.capitalCap = capitalCap;
         this.perItemCapitalCap = perItemCapitalCap;
         this.minMarginGp = minMarginGp;
@@ -42,6 +44,7 @@ public final class PersistedConfig {
         this.membersItemsAllowed = membersItemsAllowed;
         this.minDeploymentGp = minDeploymentGp;
         this.sellExitAfterRelists = sellExitAfterRelists;
+        this.avoidAfterLossGp = avoidAfterLossGp;
     }
 
     public long capitalCap() {
@@ -84,6 +87,10 @@ public final class PersistedConfig {
         return sellExitAfterRelists;
     }
 
+    public long avoidAfterLossGp() {
+        return avoidAfterLossGp;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -102,14 +109,15 @@ public final class PersistedConfig {
                 && maxOfferAgeMinutes == other.maxOfferAgeMinutes
                 && membersItemsAllowed == other.membersItemsAllowed
                 && minDeploymentGp == other.minDeploymentGp
-                && sellExitAfterRelists == other.sellExitAfterRelists;
+                && sellExitAfterRelists == other.sellExitAfterRelists
+                && avoidAfterLossGp == other.avoidAfterLossGp;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(capitalCap, perItemCapitalCap, minMarginGp, minMarginPct, minVolume,
                 maxSlots, maxOfferAgeMinutes, membersItemsAllowed, minDeploymentGp,
-                sellExitAfterRelists);
+                sellExitAfterRelists, avoidAfterLossGp);
     }
 
     @Override

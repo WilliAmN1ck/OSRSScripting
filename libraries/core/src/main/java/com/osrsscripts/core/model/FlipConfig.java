@@ -17,6 +17,7 @@ public final class FlipConfig {
     private final boolean membersItemsAllowed;
     private final long minDeploymentGp;
     private final int sellExitAfterRelists;
+    private final long avoidAfterLossGp;
 
     private FlipConfig(Builder b) {
         this.capitalCap = b.capitalCap;
@@ -29,6 +30,7 @@ public final class FlipConfig {
         this.membersItemsAllowed = b.membersItemsAllowed;
         this.minDeploymentGp = b.minDeploymentGp;
         this.sellExitAfterRelists = b.sellExitAfterRelists;
+        this.avoidAfterLossGp = b.avoidAfterLossGp;
     }
 
     /**
@@ -93,6 +95,14 @@ public final class FlipConfig {
         return sellExitAfterRelists;
     }
 
+    /**
+     * An item whose recorded net loss reaches this many gp is excluded from buy candidates until
+     * the trade history is cleared. {@code 0} disables avoidance.
+     */
+    public long avoidAfterLossGp() {
+        return avoidAfterLossGp;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -108,6 +118,7 @@ public final class FlipConfig {
         private boolean membersItemsAllowed = true;
         private long minDeploymentGp = 0L;
         private int sellExitAfterRelists = 0;
+        private long avoidAfterLossGp = 0L;
 
         /** Required for buying: leaving this at the default {@code 0} disables all buy offers. */
         public Builder capitalCap(long v) {
@@ -157,6 +168,11 @@ public final class FlipConfig {
 
         public Builder sellExitAfterRelists(int v) {
             this.sellExitAfterRelists = v;
+            return this;
+        }
+
+        public Builder avoidAfterLossGp(long v) {
+            this.avoidAfterLossGp = v;
             return this;
         }
 

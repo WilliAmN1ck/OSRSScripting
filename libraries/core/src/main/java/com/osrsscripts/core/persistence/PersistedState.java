@@ -19,6 +19,7 @@ public final class PersistedState {
     private final List<LedgerEntry> ledgerEntries;
     private final List<StockEntry> stockEntries;
     private final List<OfferStampEntry> offerStamps;
+    private final List<TradeRecordEntry> tradeHistory;
     private final PersistedConfig config;
     private final long realizedProfit;
     private final long flipsCompleted;
@@ -27,12 +28,14 @@ public final class PersistedState {
     public PersistedState(@JsonProperty("ledgerEntries") List<LedgerEntry> ledgerEntries,
                           @JsonProperty("stockEntries") List<StockEntry> stockEntries,
                           @JsonProperty("offerStamps") List<OfferStampEntry> offerStamps,
+                          @JsonProperty("tradeHistory") List<TradeRecordEntry> tradeHistory,
                           @JsonProperty("config") PersistedConfig config,
                           @JsonProperty("realizedProfit") long realizedProfit,
                           @JsonProperty("flipsCompleted") long flipsCompleted) {
         this.ledgerEntries = copyOrEmpty(ledgerEntries);
         this.stockEntries = copyOrEmpty(stockEntries);
         this.offerStamps = copyOrEmpty(offerStamps);
+        this.tradeHistory = copyOrEmpty(tradeHistory);
         this.config = config;
         this.realizedProfit = realizedProfit;
         this.flipsCompleted = flipsCompleted;
@@ -54,7 +57,7 @@ public final class PersistedState {
 
     public static PersistedState empty() {
         return new PersistedState(Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList(), null, 0L, 0L);
+                Collections.emptyList(), Collections.emptyList(), null, 0L, 0L);
     }
 
     public List<LedgerEntry> ledgerEntries() {
@@ -67,6 +70,10 @@ public final class PersistedState {
 
     public List<OfferStampEntry> offerStamps() {
         return offerStamps;
+    }
+
+    public List<TradeRecordEntry> tradeHistory() {
+        return tradeHistory;
     }
 
     /** The last applied run configuration, or {@code null} for files predating it. */
@@ -96,13 +103,14 @@ public final class PersistedState {
                 && ledgerEntries.equals(other.ledgerEntries)
                 && stockEntries.equals(other.stockEntries)
                 && offerStamps.equals(other.offerStamps)
+                && tradeHistory.equals(other.tradeHistory)
                 && Objects.equals(config, other.config);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(ledgerEntries, stockEntries, offerStamps, config, realizedProfit,
-                flipsCompleted);
+        return Objects.hash(ledgerEntries, stockEntries, offerStamps, tradeHistory, config,
+                realizedProfit, flipsCompleted);
     }
 
     @Override

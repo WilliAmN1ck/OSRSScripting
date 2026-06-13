@@ -8,6 +8,7 @@ import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.model.AccountState;
 import com.osrsscripts.core.model.FlipCandidate;
 import com.osrsscripts.core.model.FlipConfig;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -62,15 +64,17 @@ public final class FlipTask implements Task {
     private final Consumer<PersistedState> persister;
     private final Duration retryBackoff;
     private final IdleBehavior idle;
+    private final TradeHistory history;
+    private final AtomicBoolean clearHistoryRequest;
     private final Map<Integer, Integer> sellRelists = new HashMap<>();
     private Instant retryAfter = Instant.MIN;
     private int idleTicks;
 
     public FlipTask(GeClient client, WikiPriceClient prices, FlipScanner scanner, FlipEngine engine,
                     GeTax tax, BuyLimitLedger ledger, StockLedger stock, OfferTracker tracker,
-                    Supplier<FlipConfig> config, FlipActionExecutor executor,
+                    TradeHistory history, Supplier<FlipConfig> config, FlipActionExecutor executor,
                     Consumer<PersistedState> persister, Duration retryBackoff,
-                    IdleBehavior idle) {
+                    IdleBehavior idle, AtomicBoolean clearHistoryRequest) {
         this.client = Objects.requireNonNull(client, "client");
         this.prices = Objects.requireNonNull(prices, "prices");
         this.scanner = Objects.requireNonNull(scanner, "scanner");
@@ -84,6 +88,9 @@ public final class FlipTask implements Task {
         this.persister = Objects.requireNonNull(persister, "persister");
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff");
         this.idle = Objects.requireNonNull(idle, "idle");
+        this.history = Objects.requireNonNull(history, "history");
+        this.clearHistoryRequest = Objects.requireNonNull(clearHistoryRequest,
+                "clearHistoryRequest");
     }
 
     @Override
@@ -107,6 +114,10 @@ public final class FlipTask implements Task {
 
         Instant now = Instant.now();
         FlipConfig currentConfig = config.get();
+        if (clearHistoryRequest.getAndSet(false)) {
+            // Raised by the sidebar's Clear button (EDT); applied here on the script thread.
+            history.clear();
+        }
         List<GeOffer> offers = tracker.observe(client.offers(), now);
         for (GeOffer offer : offers) {
             // A completed sell ends the item's losing streak; relist pressure resets.
@@ -121,6 +132,9 @@ public final class FlipTask implements Task {
         AccountState account =
                 new AccountState(client.coins(), offers, sellableStock(mapping, currentConfig));
         List<FlipCandidate> candidates = scanner.scan(mapping, latest, volumes, currentConfig, tax);
+        // History has the final word: items that keep losing money stop being candidates.
+        candidates.removeIf(
+                c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
         List<FlipAction> actions =
                 engine.decide(candidates, latest, account, ledger, currentConfig, now, sellRelists);
         if (actions.isEmpty()) {
@@ -145,7 +159,7 @@ public final class FlipTask implements Task {
         }
         countCancelledSells(actions, offers);
         ledger.prune(now);
-        persister.accept(StateMapper.snapshot(ledger, stock, tracker, currentConfig));
+        persister.accept(StateMapper.snapshot(ledger, stock, tracker, history, currentConfig));
     }
 
     /**

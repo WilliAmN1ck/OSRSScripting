@@ -28,13 +28,15 @@ public final class OfferTracker {
 
     private final BuyLimitLedger buyLimits;
     private final StockLedger stock;
+    private final TradeHistory history;
     private final Map<Integer, Stamp> stamps = new HashMap<>();
     private long realizedProfit;
     private long flipsCompleted;
 
-    public OfferTracker(BuyLimitLedger buyLimits, StockLedger stock) {
+    public OfferTracker(BuyLimitLedger buyLimits, StockLedger stock, TradeHistory history) {
         this.buyLimits = Objects.requireNonNull(buyLimits, "buyLimits");
         this.stock = Objects.requireNonNull(stock, "stock");
+        this.history = Objects.requireNonNull(history, "history");
     }
 
     /**
@@ -87,8 +89,10 @@ public final class OfferTracker {
             stock.recordBuy(offer.itemId(), delta, unitCost);
         } else if (offer.side() == OfferSide.SELL) {
             long basis = stock.recordSell(offer.itemId(), delta);
+            boolean completedFlip = offer.filled() == offer.quantity();
             realizedProfit += gold - basis;
-            if (offer.filled() == offer.quantity()) {
+            history.recordSale(offer.itemId(), delta, gold - basis, completedFlip, now);
+            if (completedFlip) {
                 flipsCompleted++;
             }
         }

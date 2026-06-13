@@ -12,6 +12,7 @@ import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.OfferSide;
@@ -25,6 +26,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -38,8 +40,10 @@ class FlipTaskTest {
     private final GeTax tax = new GeTax(GeTaxRules.defaults());
     private final BuyLimitLedger ledger = new BuyLimitLedger();
     private final StockLedger stock = new StockLedger();
-    private final OfferTracker tracker = new OfferTracker(ledger, stock);
+    private final TradeHistory history = new TradeHistory();
+    private final OfferTracker tracker = new OfferTracker(ledger, stock, history);
     private final AtomicReference<FlipConfig> config = new AtomicReference<>(buyingConfig());
+    private final AtomicBoolean clearHistory = new AtomicBoolean(false);
     private final List<PersistedState> persisted = new ArrayList<>();
     private final List<Instant> idleTicks = new ArrayList<>();
 
@@ -51,8 +55,8 @@ class FlipTaskTest {
         WikiPriceClient prices = new WikiPriceClient(
                 fetcher, Clock.systemUTC(), BASE_URL, Duration.ofMinutes(5), Duration.ofHours(6));
         return new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                config::get, new FlipActionExecutor(client), persisted::add, retryBackoff,
-                idleTicks::add);
+                history, config::get, new FlipActionExecutor(client), persisted::add, retryBackoff,
+                idleTicks::add, clearHistory);
     }
 
     private static FlipConfig buyingConfig() {
@@ -305,6 +309,29 @@ class FlipTaskTest {
 
         assertEquals(1, client.sells.size());
         assertArrayEquals(new int[] {100, 100, 3}, client.sells.get(0)); // low = 100, not 200
+    }
+
+    @Test
+    void recordedLosersAreAvoidedUntilHistoryIsCleared() {
+        config.set(FlipConfig.builder()
+                .capitalCap(1_000_000L).perItemCapitalCap(1_000_000L)
+                .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
+                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .membersItemsAllowed(false) // keeps the canned members item out of the way
+                .avoidAfterLossGp(1_000L).build());
+        client.open = true;
+        client.coins = 1_000L;
+        client.offers = OfferMapper.fillEightSlots(List.of());
+        history.recordSale(100, 5, -1_500L, true, Instant.now()); // item 100 keeps losing
+
+        FlipTask task = task(new CannedFetcher());
+        task.execute();
+        assertTrue(client.buys.isEmpty(), "a recorded loser is not a buy candidate");
+
+        clearHistory.set(true); // the sidebar Clear button raises this flag
+        task.execute();
+        assertEquals(1, client.buys.size(), "a cleared loser gets a fresh start");
+        assertArrayEquals(new int[] {100, 100, 10}, client.buys.get(0));
     }
 
     @Test

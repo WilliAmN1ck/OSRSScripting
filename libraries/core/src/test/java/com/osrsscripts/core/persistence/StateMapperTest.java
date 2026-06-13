@@ -3,10 +3,9 @@ package com.osrsscripts.core.persistence;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.osrsscripts.core.ge.BuyLimitLedger;
-import com.osrsscripts.core.ge.GeTax;
-import com.osrsscripts.core.ge.GeTaxRules;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
+import com.osrsscripts.core.ge.TradeHistory;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.OfferSide;
@@ -32,6 +31,7 @@ class StateMapperTest {
                 .membersItemsAllowed(false)
                 .minDeploymentGp(1_000L)
                 .sellExitAfterRelists(3)
+                .avoidAfterLossGp(2_000L)
                 .build();
     }
 
@@ -39,9 +39,10 @@ class StateMapperTest {
     void configRoundTripsThroughSnapshot() {
         BuyLimitLedger buyLimits = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(buyLimits, stock);
+        TradeHistory history = new TradeHistory();
+        OfferTracker tracker = new OfferTracker(buyLimits, stock, history);
 
-        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, config());
+        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, history, config());
         FlipConfig restored = StateMapper.restoredConfig(state);
 
         assertEquals(116_000L, restored.capitalCap());
@@ -54,6 +55,7 @@ class StateMapperTest {
         assertEquals(false, restored.membersItemsAllowed());
         assertEquals(1_000L, restored.minDeploymentGp());
         assertEquals(3, restored.sellExitAfterRelists());
+        assertEquals(2_000L, restored.avoidAfterLossGp());
     }
 
     @Test
@@ -65,22 +67,29 @@ class StateMapperTest {
     void snapshotAndRestoreRoundTripAllState() {
         BuyLimitLedger buyLimits = new BuyLimitLedger();
         StockLedger stock = new StockLedger();
-        OfferTracker tracker = new OfferTracker(buyLimits, stock);
+        TradeHistory history = new TradeHistory();
+        OfferTracker tracker = new OfferTracker(buyLimits, stock, history);
 
-        // A partially filled buy observed once: populates all three collaborators.
+        // A partially filled buy observed once, plus a recorded sale: populates everything.
         tracker.observe(List.of(
                 new GeOffer(1, OfferStatus.PARTIAL, OfferSide.BUY, 4151, 100L, 10, 4, null)), T0);
+        history.recordSale(561, 2, 80L, true, T0);
 
-        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, config());
+        PersistedState state = StateMapper.snapshot(buyLimits, stock, tracker, history, config());
 
         BuyLimitLedger restoredLimits = new BuyLimitLedger();
         StockLedger restoredStock = new StockLedger();
-        OfferTracker restoredTracker = new OfferTracker(restoredLimits, restoredStock);
-        StateMapper.restore(state, restoredLimits, restoredStock, restoredTracker);
+        TradeHistory restoredHistory = new TradeHistory();
+        OfferTracker restoredTracker =
+                new OfferTracker(restoredLimits, restoredStock, restoredHistory);
+        StateMapper.restore(state, restoredLimits, restoredStock, restoredTracker,
+                restoredHistory);
 
         assertEquals(4, restoredLimits.purchasedWithin(4151, T0));
         assertEquals(4, restoredStock.ownedQty(4151));
         assertEquals(0L, restoredTracker.realizedProfit());
+        assertEquals(80L, restoredHistory.records().get(0).netProfit());
+        assertEquals(561, restoredHistory.records().get(0).itemId());
 
         // The restored stamp re-attaches: same placement time, no re-recorded fills.
         List<GeOffer> observed = restoredTracker.observe(List.of(
@@ -95,10 +104,12 @@ class StateMapperTest {
         PersistedState state = new PersistedState(List.of(), List.of(),
                 List.of(new OfferStampEntry(1, 4151, "JUNK", 100L, 0, 0L, T0.toEpochMilli()),
                         new OfferStampEntry(2, 561, "SELL", 200L, 1, 200L, T0.toEpochMilli())),
-                null, 0L, 0L);
+                List.of(), null, 0L, 0L);
 
-        OfferTracker tracker = new OfferTracker(new BuyLimitLedger(), new StockLedger());
-        StateMapper.restore(state, new BuyLimitLedger(), new StockLedger(), tracker);
+        OfferTracker tracker = new OfferTracker(new BuyLimitLedger(), new StockLedger(),
+                new TradeHistory());
+        StateMapper.restore(state, new BuyLimitLedger(), new StockLedger(), tracker,
+                new TradeHistory());
 
         assertEquals(1, tracker.stamps().size());
         assertEquals(2, tracker.stamps().get(0).slot());

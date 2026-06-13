@@ -33,7 +33,7 @@ class FlipperPanelTest {
     @Test
     void applyParsesEditedFieldsIntoConfig() {
         List<FlipConfig> applied = new ArrayList<>();
-        FlipperPanel panel = new FlipperPanel(initial(), applied::add);
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
 
         panel.setField(FlipperPanel.Field.CAPITAL_CAP, "2000000");
         panel.setField(FlipperPanel.Field.MAX_SLOTS, "6");
@@ -53,7 +53,7 @@ class FlipperPanelTest {
     @Test
     void invalidInputIsRejectedAndNothingApplied() {
         List<FlipConfig> applied = new ArrayList<>();
-        FlipperPanel panel = new FlipperPanel(initial(), applied::add);
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
 
         panel.setField(FlipperPanel.Field.CAPITAL_CAP, "lots of gp");
         panel.clickApply();
@@ -79,7 +79,7 @@ class FlipperPanelTest {
     @Test
     void membersCheckboxFlowsIntoTheConfig() {
         List<FlipConfig> applied = new ArrayList<>();
-        FlipperPanel panel = new FlipperPanel(initial(), applied::add);
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
 
         panel.clickApply();
         assertTrue(applied.get(0).membersItemsAllowed(), "default config allows members items");
@@ -92,7 +92,7 @@ class FlipperPanelTest {
     @Test
     void errorClearsOnTheNextSuccessfulApply() {
         List<FlipConfig> applied = new ArrayList<>();
-        FlipperPanel panel = new FlipperPanel(initial(), applied::add);
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
 
         panel.setField(FlipperPanel.Field.MIN_VOLUME, "not a number");
         panel.clickApply();
@@ -106,10 +106,12 @@ class FlipperPanelTest {
 
     @Test
     void statsUpdateLandsOnTheLabels() throws InterruptedException, InvocationTargetException {
-        FlipperPanel panel = new FlipperPanel(initial(), config -> { });
+        FlipperPanel panel = new FlipperPanel(initial(), config -> { }, () -> { });
 
         panel.update(new StatsSnapshot(Duration.ofMinutes(90), 470L, 12_470L, 3L, 250_000L,
-                List.of("1 BUY Test item 4/10 @ 100")));
+                List.of("1 BUY Test item 4/10 @ 100"),
+                List.of(new StatsSnapshot.TradeRow("Raw pike", 12L, 1, 2),
+                        new StatsSnapshot.TradeRow("Gold bar", -300L, 2, 6))));
         // update marshals onto the EDT; wait for it to drain before asserting.
         SwingUtilities.invokeAndWait(() -> { });
 
@@ -118,5 +120,18 @@ class FlipperPanelTest {
         assertTrue(panel.statsText().contains("12,470"), "all-time profit shown");
         assertTrue(panel.statsText().contains("250,000"), "cash shown");
         assertTrue(panel.statsText().contains("Test item"), "offer line shown");
+        assertEquals(2, panel.historyRowCount(), "trade history table populated");
+    }
+
+    @Test
+    void clearHistoryButtonFiresTheCallback() {
+        java.util.concurrent.atomic.AtomicInteger clears =
+                new java.util.concurrent.atomic.AtomicInteger();
+        FlipperPanel panel = new FlipperPanel(initial(), config -> { },
+                clears::incrementAndGet);
+
+        panel.clickClearHistory();
+
+        assertEquals(1, clears.get());
     }
 }

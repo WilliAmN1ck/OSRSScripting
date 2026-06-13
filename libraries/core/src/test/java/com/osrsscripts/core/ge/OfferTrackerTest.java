@@ -20,13 +20,15 @@ class OfferTrackerTest {
 
     private BuyLimitLedger buyLimits;
     private StockLedger stock;
+    private TradeHistory history;
     private OfferTracker tracker;
 
     @BeforeEach
     void setUp() {
         buyLimits = new BuyLimitLedger();
         stock = new StockLedger();
-        tracker = new OfferTracker(buyLimits, stock);
+        history = new TradeHistory();
+        tracker = new OfferTracker(buyLimits, stock, history);
     }
 
     /** Offer whose transferred gold sits exactly at the listed price. */
@@ -124,6 +126,13 @@ class OfferTrackerTest {
         tracker.observe(List.of(offer(1, OfferStatus.COMPLETE, OfferSide.SELL, 150L, 10, 10)), T2);
         assertEquals(500L, tracker.realizedProfit());
         assertEquals(1L, tracker.flipsCompleted());
+
+        // The trade history learned the same result.
+        TradeHistory.ItemRecord record = history.records().get(0);
+        assertEquals(ITEM, record.itemId());
+        assertEquals(500L, record.netProfit());
+        assertEquals(1, record.flipsCompleted());
+        assertEquals(10, record.qtySold());
     }
 
     @Test
@@ -166,7 +175,8 @@ class OfferTrackerTest {
         // Fresh collaborators, as after a script restart.
         StockLedger newStock = new StockLedger();
         newStock.load(stock.lots());
-        OfferTracker restored = new OfferTracker(new BuyLimitLedger(), newStock);
+        OfferTracker restored = new OfferTracker(new BuyLimitLedger(), newStock,
+                new TradeHistory());
         restored.restore(stamps, 470L, 1L);
 
         assertEquals(470L, restored.realizedProfit());
@@ -179,7 +189,8 @@ class OfferTrackerTest {
         assertEquals(4, newStock.ownedQty(ITEM)); // no double count of the pre-restart fill
 
         // A non-matching offer in that slot is treated as brand new.
-        OfferTracker fresh = new OfferTracker(new BuyLimitLedger(), new StockLedger());
+        OfferTracker fresh = new OfferTracker(new BuyLimitLedger(), new StockLedger(),
+                new TradeHistory());
         fresh.restore(stamps, 0L, 0L);
         List<GeOffer> mismatch = fresh.observe(
                 List.of(offer(1, OfferStatus.ACTIVE, OfferSide.BUY, 90L, 10, 0)), T2);
