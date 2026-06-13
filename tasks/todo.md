@@ -63,6 +63,11 @@
 - [x] Tests: 5 plan() reason cases (core) + panel advisory render; full suite + fatJar green
 - [x] Live-verified on Echo: advisory renders amber, reason NO_CANDIDATES correct; HTML-wrap readable
 - [x] /code-review max (1 import-order nit fixed; no correctness bugs)
-- [ ] commit; PR
+- [x] Committed (ccd55c0) + PR #9 opened against main
+- [x] Sidebar config fields stacked label-above-input for readability in the narrow RuneLite
+      column (81db603); live-verified values now visible (6000000, 1000000, …)
+- [x] Capital-aware ranking: FlipScanner now ranks by capital deployed per offer (capped at
+      perItemCap), tie-broken by profit/cycle — so a big bankroll buys expensive items instead of
+      cheap high-volume flips. Was never implemented before (git-confirmed). 3 new scanner tests.
 
 ## Phase 4 — Publish / distribution  (later / optional)

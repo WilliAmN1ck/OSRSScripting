@@ -55,12 +55,60 @@ class FlipScannerTest {
     }
 
     @Test
-    void ranksByMarginScaledByThroughput() {
+    void ranksByCapitalDeployed() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
         List<FlipCandidate> result = scanner.scan(mapping(), prices(), volumes(), config, tax);
-        // 100: 78 * min(1000,1200)=78000 ; 200: 58 * min(100,100)=5800
+        // capital = buyPrice * min(buyLimit, volume):
+        // 100: 1000 * min(1000,1200) = 1,000,000 ; 200: 2000 * min(100,100) = 200,000
         assertEquals(100, result.get(0).itemId());
         assertEquals(200, result.get(1).itemId());
+    }
+
+    @Test
+    void prefersTheCapitalHeavyItemOverTheMoreProfitableSmallOne() {
+        // The cheap item earns far more profit per cycle, but the pricey item deploys 15x the
+        // capital; with idle cash to spend, the capital-heavy offer must rank first.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "cheap", false, 1000)); // buy limit 1000
+        m.put(2, new ItemMeta(2, "pricey", false, 30));  // buy limit 30
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(300, t, 100, t));          // buy 100, net margin ~194
+        p.put(2, new PricePoint(53_000, t, 50_000, t));    // buy 50000, net margin ~1940
+        Map<Integer, VolumePoint> v = new HashMap<>();
+        v.put(1, new VolumePoint(5000, 5000));
+        v.put(2, new VolumePoint(5000, 5000));
+        FlipConfig config = FlipConfig.builder()
+                .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
+
+        List<FlipCandidate> result = scanner.scan(m, p, v, config, tax);
+
+        // capital: item1 = 100 * min(1000,5000) = 100,000 ; item2 = 50000 * min(30,5000) = 1,500,000
+        // profit: item1 ~ 194 * 1000 = 194,000 (higher) ; item2 ~ 1940 * 30 = 58,200
+        assertEquals(2, result.get(0).itemId(), "the capital-heavy item ranks first");
+        assertEquals(1, result.get(1).itemId());
+    }
+
+    @Test
+    void capsCapitalAtThePerItemCapThenBreaksTiesByProfit() {
+        // Both items can deploy well past a 1M per-item cap, so they tie on capital; the higher-ROI
+        // one (more profit for the same gold) wins the tiebreak.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "lowRoi", false, 1000));
+        m.put(2, new ItemMeta(2, "highRoi", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1_050, t, 1_000, t)); // buy 1000, thin margin
+        p.put(2, new PricePoint(1_200, t, 1_000, t)); // buy 1000, fat margin
+        Map<Integer, VolumePoint> v = new HashMap<>();
+        v.put(1, new VolumePoint(5000, 5000));
+        v.put(2, new VolumePoint(5000, 5000));
+        FlipConfig config = FlipConfig.builder()
+                .minMarginGp(1).perItemCapitalCap(1_000_000L).build();
+
+        List<FlipCandidate> result = scanner.scan(m, p, v, config, tax);
+
+        // Both cap at 1M capital (1000 gp * 1000 units); item 2's higher margin breaks the tie.
+        assertEquals(2, result.get(0).itemId());
+        assertEquals(1, result.get(1).itemId());
     }
 
     @Test

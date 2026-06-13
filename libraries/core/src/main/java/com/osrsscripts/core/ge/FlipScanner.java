@@ -13,8 +13,9 @@ import java.util.Map;
 /**
  * Selects and ranks flip candidates from live market data. An item buys at its instant-sell price
  * ({@code low}) and sells at its instant-buy price ({@code high}); candidates failing the config's
- * margin, ROI, or volume floors are discarded. Ranking favours net margin scaled by realistic
- * throughput (the smaller of buy limit and traded volume).
+ * margin, ROI, or volume floors are discarded. Ranking favours the capital each offer would
+ * deploy — so a large bankroll is put to work rather than parked behind small, high-volume flips —
+ * breaking ties by the profit that capital earns per cycle.
  */
 public final class FlipScanner {
 
@@ -59,15 +60,34 @@ public final class FlipScanner {
                     roi));
         }
 
-        candidates.sort(Comparator.comparingLong(this::score).reversed()
+        long perItemCap = config.perItemCapitalCap();
+        candidates.sort(Comparator
+                .comparingLong((FlipCandidate c) -> capitalDeployed(c, perItemCap)).reversed()
+                .thenComparing(Comparator.comparingLong(
+                        (FlipCandidate c) -> profitPerCycle(c, perItemCap)).reversed())
                 .thenComparingInt(FlipCandidate::itemId));
         return candidates;
     }
 
-    private long score(FlipCandidate candidate) {
+    /**
+     * Units one offer could realistically buy in a cycle: throttled by the 4h buy limit, the
+     * traded volume, and how many the per-item capital cap can afford.
+     */
+    private static long deployableUnits(FlipCandidate candidate, long perItemCap) {
         long throughput = candidate.buyLimit() > 0
                 ? Math.min(candidate.buyLimit(), candidate.volume())
                 : candidate.volume();
-        return candidate.netMarginPerItem() * throughput;
+        long byCap = candidate.buyPrice() > 0 ? perItemCap / candidate.buyPrice() : 0;
+        return Math.min(throughput, byCap);
+    }
+
+    /** Capital one offer would deploy — the primary ranking key, so big offers fill slots first. */
+    private static long capitalDeployed(FlipCandidate candidate, long perItemCap) {
+        return candidate.buyPrice() * deployableUnits(candidate, perItemCap);
+    }
+
+    /** Profit that capital earns per cycle — the tiebreak among offers of equal size. */
+    private static long profitPerCycle(FlipCandidate candidate, long perItemCap) {
+        return candidate.netMarginPerItem() * deployableUnits(candidate, perItemCap);
     }
 }
