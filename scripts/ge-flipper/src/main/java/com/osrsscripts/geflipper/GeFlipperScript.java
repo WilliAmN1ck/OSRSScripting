@@ -217,7 +217,8 @@ public final class GeFlipperScript implements TribotScript {
                 .minVolume(1_000L)
                 .minDeploymentGp(1_000L)
                 .maxSlots(3)
-                .maxOfferAge(Duration.ofMinutes(30))
+                .maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .sellExitAfterRelists(3)
                 .avoidAfterLossGp(1_000L)
                 .build();

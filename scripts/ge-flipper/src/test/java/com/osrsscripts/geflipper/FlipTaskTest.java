@@ -67,7 +67,8 @@ class FlipTaskTest {
                 .minMarginPct(0.0)
                 .minVolume(0L)
                 .maxSlots(8)
-                .maxOfferAge(Duration.ofMinutes(30))
+                .maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .build();
     }
 
@@ -270,7 +271,8 @@ class FlipTaskTest {
         config.set(FlipConfig.builder()
                 .capitalCap(1_000_000L).perItemCapitalCap(1_000_000L)
                 .minMarginGp(1_000_000L).minMarginPct(0.0).minVolume(0L)
-                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30)).build());
+                .maxSlots(8).maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30)).build());
         FlipTask task = task(new CannedFetcher());
         task.execute();
         assertTrue(client.buys.isEmpty());
@@ -286,7 +288,8 @@ class FlipTaskTest {
         config.set(FlipConfig.builder()
                 .capitalCap(0L).perItemCapitalCap(1_000_000L)
                 .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
-                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .maxSlots(8).maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .sellExitAfterRelists(1).build());
         client.open = true;
         client.coins = 0L;
@@ -316,7 +319,8 @@ class FlipTaskTest {
         config.set(FlipConfig.builder()
                 .capitalCap(1_000_000L).perItemCapitalCap(1_000_000L)
                 .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
-                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .maxSlots(8).maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .membersItemsAllowed(false) // keeps the canned members item out of the way
                 .avoidAfterLossGp(1_000L).build());
         client.open = true;
@@ -353,7 +357,8 @@ class FlipTaskTest {
         config.set(FlipConfig.builder()
                 .capitalCap(0L).perItemCapitalCap(1_000_000L)
                 .minMarginGp(1L).minMarginPct(0.0).minVolume(0L)
-                .maxSlots(8).maxOfferAge(Duration.ofMinutes(30))
+                .maxSlots(8).maxOfferAgeBuy(Duration.ofMinutes(30))
+                .maxOfferAgeSell(Duration.ofMinutes(30))
                 .membersItemsAllowed(false).build());
         client.open = true;
         client.coins = 0L;

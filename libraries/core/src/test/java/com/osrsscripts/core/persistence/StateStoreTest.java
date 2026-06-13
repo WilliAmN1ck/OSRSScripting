@@ -22,13 +22,34 @@ class StateStoreTest {
                 Arrays.asList(new OfferStampEntry(1, 4151, "SELL", 150_000L, 2, 300_000L,
                         1_700_000_600_000L)),
                 Arrays.asList(new TradeRecordEntry(4151, 470L, 1, 10, 1_700_000_700_000L)),
-                new PersistedConfig(116_000L, 25_000L, 2L, 0.01, 5_000L, 3, 30L, false, 1_000L, 3,
-                        2_000L),
+                new PersistedConfig(116_000L, 25_000L, 2L, 0.01, 5_000L, 3, 15L, 45L, null, false,
+                        1_000L, 3, 2_000L),
                 123_456L, 7L);
 
         store.save(original);
 
         assertEquals(original, store.load());
+    }
+
+    @Test
+    void legacyOfferAgeSeedsBothBuyAndSellWithoutWipingState(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("state.json");
+        // Pre-split state: a single maxOfferAgeMinutes and real ledger/profit. Renaming the field
+        // must migrate the age (not reset it) and must not make the whole state fail to load.
+        Files.write(file, ("{\"ledgerEntries\":[{\"itemId\":561,\"qty\":100,"
+                + "\"epochMillis\":1700000000000}],\"stockEntries\":[],\"offerStamps\":[],"
+                + "\"config\":{\"capitalCap\":116000,\"perItemCapitalCap\":25000,\"minMarginGp\":2,"
+                + "\"minMarginPct\":0.01,\"minVolume\":5000,\"maxSlots\":3,"
+                + "\"maxOfferAgeMinutes\":90,\"membersItemsAllowed\":false,\"minDeploymentGp\":1000,"
+                + "\"sellExitAfterRelists\":3,\"avoidAfterLossGp\":2000},"
+                + "\"realizedProfit\":42,\"flipsCompleted\":3}").getBytes());
+
+        PersistedState loaded = new StateStore(file).load();
+
+        assertEquals(90L, loaded.config().maxOfferAgeBuyMinutes());
+        assertEquals(90L, loaded.config().maxOfferAgeSellMinutes());
+        assertEquals(1, loaded.ledgerEntries().size());
+        assertEquals(42L, loaded.realizedProfit());
     }
 
     @Test

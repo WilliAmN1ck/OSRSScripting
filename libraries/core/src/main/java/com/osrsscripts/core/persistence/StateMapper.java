@@ -44,9 +44,9 @@ public final class StateMapper {
         }
         PersistedConfig persistedConfig = new PersistedConfig(config.capitalCap(),
                 config.perItemCapitalCap(), config.minMarginGp(), config.minMarginPct(),
-                config.minVolume(), config.maxSlots(), config.maxOfferAge().toMinutes(),
-                config.membersItemsAllowed(), config.minDeploymentGp(),
-                config.sellExitAfterRelists(), config.avoidAfterLossGp());
+                config.minVolume(), config.maxSlots(), config.maxOfferAgeBuy().toMinutes(),
+                config.maxOfferAgeSell().toMinutes(), null, config.membersItemsAllowed(),
+                config.minDeploymentGp(), config.sellExitAfterRelists(), config.avoidAfterLossGp());
         return new PersistedState(ledgerEntries, stockEntries, stampEntries, tradeEntries,
                 persistedConfig, tracker.realizedProfit(), tracker.flipsCompleted());
     }
@@ -64,7 +64,8 @@ public final class StateMapper {
                 .minMarginPct(c.minMarginPct())
                 .minVolume(c.minVolume())
                 .maxSlots(c.maxSlots())
-                .maxOfferAge(Duration.ofMinutes(c.maxOfferAgeMinutes()))
+                .maxOfferAgeBuy(Duration.ofMinutes(c.maxOfferAgeBuyMinutes()))
+                .maxOfferAgeSell(Duration.ofMinutes(c.maxOfferAgeSellMinutes()))
                 .membersItemsAllowed(c.membersItemsAllowed())
                 .minDeploymentGp(c.minDeploymentGp())
                 .sellExitAfterRelists(c.sellExitAfterRelists())
