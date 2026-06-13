@@ -36,7 +36,7 @@ public final class FlipperPanel extends JPanel {
     /** The editable config fields, in display order. */
     public enum Field {
         CAPITAL_CAP("Capital cap (gp)"),
-        PER_ITEM_CAPITAL_CAP("Per-item capital cap (gp)"),
+        PER_ITEM_CAPITAL_CAP("Max spend per item (gp)"),
         MIN_MARGIN_GP("Min margin (gp)"),
         MIN_MARGIN_PCT("Min margin (fraction)"),
         MIN_VOLUME("Min volume (units/h)"),
