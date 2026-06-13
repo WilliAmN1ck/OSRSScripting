@@ -24,7 +24,11 @@ public final class OfferMapper {
     /** Item id of coins, which are cash rather than sellable stock. */
     public static final int COINS_ITEM_ID = 995;
 
-    private static final int SLOT_COUNT = 8;
+    /** GE slots available on a members world. */
+    public static final int MEMBERS_SLOT_COUNT = 8;
+
+    /** GE slots available on a free-to-play world. */
+    public static final int FREE_SLOT_COUNT = 3;
 
     private OfferMapper() {
     }
@@ -67,14 +71,23 @@ public final class OfferMapper {
                 transferredGold, null);
     }
 
-    /** Returns all eight slots in order, filling any slot absent from {@code present} with an empty offer. */
+    /** Returns all eight slots in order, filling any slot absent from {@code present} with empty. */
     public static List<GeOffer> fillEightSlots(List<GeOffer> present) {
+        return fillSlots(present, MEMBERS_SLOT_COUNT);
+    }
+
+    /**
+     * Returns {@code slotCount} slots in order, filling any slot absent from {@code present} with an
+     * empty offer. The count reflects the world: a free-to-play world exposes only the first three
+     * GE slots, so the engine must not see the other five as idle capacity to fill.
+     */
+    public static List<GeOffer> fillSlots(List<GeOffer> present, int slotCount) {
         Map<Integer, GeOffer> bySlot = new HashMap<>();
         for (GeOffer offer : present) {
             bySlot.put(offer.slot(), offer);
         }
-        List<GeOffer> result = new ArrayList<>(SLOT_COUNT);
-        for (int slot = 1; slot <= SLOT_COUNT; slot++) {
+        List<GeOffer> result = new ArrayList<>(slotCount);
+        for (int slot = 1; slot <= slotCount; slot++) {
             GeOffer offer = bySlot.get(slot);
             result.add(offer != null ? offer : GeOffer.empty(slot));
         }

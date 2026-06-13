@@ -7,9 +7,11 @@ import java.util.List;
 import java.util.Map;
 import org.tribot.script.sdk.GrandExchange;
 import org.tribot.script.sdk.Inventory;
+import org.tribot.script.sdk.Worlds;
 import org.tribot.script.sdk.query.Query;
 import org.tribot.script.sdk.types.GrandExchangeOffer;
 import org.tribot.script.sdk.types.InventoryItem;
+import org.tribot.script.sdk.types.World;
 import org.tribot.script.sdk.types.definitions.ItemDefinition;
 
 /**
@@ -38,7 +40,7 @@ public final class SdkGeClient implements GeClient {
     public List<GeOffer> offers() {
         List<GeOffer> present = new ArrayList<>();
         for (GrandExchangeOffer offer : Query.grandExchangeOffers().toList()) {
-            // Empty slots (which may expose null slot/type) are reconstructed by fillEightSlots.
+            // Empty slots (which may expose null slot/type) are reconstructed by fillSlots.
             if (offer.getStatus() == GrandExchangeOffer.Status.EMPTY) {
                 continue;
             }
@@ -52,7 +54,18 @@ public final class SdkGeClient implements GeClient {
                     offer.getTransferredItemQuantity(),
                     offer.getTransferredGoldQuantity()));
         }
-        return OfferMapper.fillEightSlots(present);
+        return OfferMapper.fillSlots(present, slotCount());
+    }
+
+    /**
+     * GE slots the current world exposes: three on free-to-play, eight on members. Padding to a
+     * fixed eight would make the engine treat the five non-existent F2P slots as idle capacity and
+     * wrongly advise the user to raise their slot cap. Defaults to members when the world is
+     * momentarily unknown, the same eight-slot behaviour as before.
+     */
+    private static int slotCount() {
+        boolean members = Worlds.getCurrent().map(World::isMembers).orElse(true);
+        return members ? OfferMapper.MEMBERS_SLOT_COUNT : OfferMapper.FREE_SLOT_COUNT;
     }
 
     @Override
