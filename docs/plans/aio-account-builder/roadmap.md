@@ -60,7 +60,8 @@ F2P-reachable first. One line per skill; expand into per-method sub-tasks as bui
 - [ ] Easy Varrock Diary
 
 ## 8. Antiban & humanization
-- [x] Behavioral antiban: fidgets, fatigue scaling, look-away AFK (reused from ge-flipper)
+- [x] Behavioural antiban in the builder: fatigue-scaled cadence + look-away AFK (pure core.humanize).
+- [ ] SDK fidgets (camera/tab/mouse) in the builder — pending the sdk-support extraction of SdkFidget.
 - [x] Break-aware idling via SDK BreakHandler sidecar (reused)
 - [ ] MiniBreak system (short in-task micro-breaks)
 - [ ] "Huge antiban / anti-pattern" coverage review across all task types

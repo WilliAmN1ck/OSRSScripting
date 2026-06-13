@@ -216,7 +216,10 @@
 - [x] ProfileCodec (gson; normalizes missing/older fields) + ProfileStore (file I/O; missing/corrupt → default).
 - [x] gson added as testImplementation (plugin provides compileOnly; Echo provides at runtime).
 - [x] 26 tests green (added ProfileCodec 3, ProfileStore 4).
-- [ ] Deferred until live testing: wire load-on-start / save-on-config-change into the script + panel
-      (resume needs Echo verification); paint/stats; full profile GUI.
+- [x] Review-driven (do-it-all): build-complete stop; Watchdog wired (no WC XP for 5 min → stop);
+      SdkGameView explicit Skill→SDK map; MainBacklogTask non-BuilderTask guard; antiban parity via
+      pure core.humanize (fatigue cadence + look-away AFK). 30 tests green.
+- [ ] Deferred (need client / extraction): SDK fidgets (need sdk-support SdkFidget extraction);
+      persistence resume wiring + paint/stats (need live verify); MiniBreaks.
 
 ## Phase 4 — Publish / distribution  (later / optional)

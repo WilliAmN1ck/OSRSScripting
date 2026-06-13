@@ -17,7 +17,7 @@ import org.tribot.script.sdk.Skill as SdkSkill
 internal object SdkGameView : GameView {
 
     override val skills = object : SkillView {
-        override fun level(skill: Skill): Int = SdkSkill.valueOf(skill.name).getActualLevel()
+        override fun level(skill: Skill): Int = toSdk(skill).getActualLevel()
     }
 
     override val inventory = object : InventoryView {
@@ -33,4 +33,31 @@ internal object SdkGameView : GameView {
 
     override val isMembersWorld: Boolean
         get() = Worlds.getCurrent().map { it.isMembers }.orElse(false)
+
+    /** Explicit, compile-checked mapping so a name change in either enum is caught here, not at runtime. */
+    private fun toSdk(skill: Skill): SdkSkill = when (skill) {
+        Skill.ATTACK -> SdkSkill.ATTACK
+        Skill.STRENGTH -> SdkSkill.STRENGTH
+        Skill.DEFENCE -> SdkSkill.DEFENCE
+        Skill.HITPOINTS -> SdkSkill.HITPOINTS
+        Skill.RANGED -> SdkSkill.RANGED
+        Skill.PRAYER -> SdkSkill.PRAYER
+        Skill.MAGIC -> SdkSkill.MAGIC
+        Skill.RUNECRAFT -> SdkSkill.RUNECRAFT
+        Skill.CONSTRUCTION -> SdkSkill.CONSTRUCTION
+        Skill.AGILITY -> SdkSkill.AGILITY
+        Skill.HERBLORE -> SdkSkill.HERBLORE
+        Skill.THIEVING -> SdkSkill.THIEVING
+        Skill.CRAFTING -> SdkSkill.CRAFTING
+        Skill.FLETCHING -> SdkSkill.FLETCHING
+        Skill.SLAYER -> SdkSkill.SLAYER
+        Skill.HUNTER -> SdkSkill.HUNTER
+        Skill.MINING -> SdkSkill.MINING
+        Skill.SMITHING -> SdkSkill.SMITHING
+        Skill.FISHING -> SdkSkill.FISHING
+        Skill.COOKING -> SdkSkill.COOKING
+        Skill.FIREMAKING -> SdkSkill.FIREMAKING
+        Skill.WOODCUTTING -> SdkSkill.WOODCUTTING
+        Skill.FARMING -> SdkSkill.FARMING
+    }
 }

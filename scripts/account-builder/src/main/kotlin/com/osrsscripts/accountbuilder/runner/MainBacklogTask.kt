@@ -4,6 +4,7 @@ import com.osrsscripts.accountbuilder.engine.BuilderScheduler
 import com.osrsscripts.accountbuilder.engine.GameView
 import com.osrsscripts.accountbuilder.task.BuilderTask
 import com.osrsscripts.core.task.Task
+import org.tribot.script.sdk.Log
 
 /**
  * Drives the [BuilderScheduler] from the shared [Task] runner: each tick, run one step of the next
@@ -18,7 +19,14 @@ internal class MainBacklogTask(
     override fun shouldRun(): Boolean = true
 
     override fun execute() {
-        val task = scheduler.next(view()) as? BuilderTask ?: return
+        val next = scheduler.next(view()) ?: return
+        val task = next as? BuilderTask
+        if (task == null) {
+            // Should never happen — only BuilderTasks belong in the backlog. If it does, the
+            // scheduler would keep returning it and stall, so surface it loudly instead.
+            Log.warn("Backlog task '${next.key.value}' is not a BuilderTask — cannot execute; skipping.")
+            return
+        }
         task.execute()
     }
 
