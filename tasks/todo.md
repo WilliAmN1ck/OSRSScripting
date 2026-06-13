@@ -45,4 +45,11 @@
   - [x] 3d.3 Live session — ALL 5 gate items passed; 18 flips / ~2.4k gp autonomous soak; 7 live defects fixed at root (noted items, config persistence, GE wedge, jar clobbering, interface flapping, abort/collect/open backoff)
   - [x] 3d.4 Handoff (docs/plans/phase-3-ge-flipper/handoff-3d-live-verification.md) + PR; items 2 (CLI) + 7 (breaks) deferred
 - Reference: docs/reference/tribot-sdk.md ; handoff: docs/plans/phase-3-ge-flipper/handoff.md
+## Post-phase-3 tech debt — branch `flipper-tech-debt` (2026-06-12)
+- [x] Profit accounting by transferred gold (better-price fills exact; stamps persist gold baseline w/ migration)
+- [x] Sell-exit escalation: insta-sell after N stale relists (FlipConfig.sellExitAfterRelists, panel field, fresh default 3)
+- [x] Members stock never offered on F2P (sellableStock filter)
+- [x] Live visual check of 3d features: GE auto-close ✓, fidgets ✓ (tab glances observed), break profile loaded ✓, new panel fields render ✓
+- [ ] Live-verify: sell transferredGold assumed post-tax — compare a live sell's profit delta vs hand math
+
 ## Phase 4 — Publish / distribution  (later / optional)
