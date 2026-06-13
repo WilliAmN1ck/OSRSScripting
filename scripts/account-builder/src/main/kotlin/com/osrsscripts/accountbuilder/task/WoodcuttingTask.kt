@@ -37,6 +37,11 @@ internal class WoodcuttingTask(
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(Skill.WOODCUTTING) >= targetLevel()
 
+    // Not runnable with no tree selected — surfaces via the scheduler's "nothing runnable" path
+    // (a single periodic status line) rather than a per-tick warning from inside the task.
+    override fun validate(view: GameView): Boolean =
+        requirements.meets(view) && allowedTrees().isNotEmpty()
+
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("Woodcutting ${view.skills.level(Skill.WOODCUTTING)}/${targetLevel()}")
 
@@ -52,10 +57,7 @@ internal class WoodcuttingTask(
         if (MyPlayer.isAnimating()) return // already chopping
 
         val allowed = allowedTrees()
-        if (allowed.isEmpty()) {
-            Log.warn("No tree types selected within your Woodcutting level — pick one in the sidebar.")
-            return
-        }
+        if (allowed.isEmpty()) return // validate() gates this; guards the rare unselect-mid-tick race
 
         val tree = Query.gameObjects()
             .actionEquals("Chop down")

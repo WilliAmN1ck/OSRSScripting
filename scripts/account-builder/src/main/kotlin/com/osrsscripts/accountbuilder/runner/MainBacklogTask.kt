@@ -18,8 +18,16 @@ internal class MainBacklogTask(
 
     override fun shouldRun(): Boolean = true
 
+    private var lastIdleLogMs = 0L
+
     override fun execute() {
-        val next = scheduler.next(view()) ?: return
+        val next = scheduler.next(view())
+        if (next == null) {
+            // Not complete (the script checks that first) but nothing is currently runnable — e.g.
+            // no tree selected or a task's requirements aren't met. Surface it periodically.
+            logIdlePeriodically()
+            return
+        }
         val task = next as? BuilderTask
         if (task == null) {
             // Should never happen — only BuilderTasks belong in the backlog. If it does, the
@@ -30,5 +38,17 @@ internal class MainBacklogTask(
         task.execute()
     }
 
+    private fun logIdlePeriodically() {
+        val now = System.currentTimeMillis()
+        if (now - lastIdleLogMs >= IDLE_LOG_INTERVAL_MS) {
+            lastIdleLogMs = now
+            Log.info("Waiting — no task is currently runnable (check tree selection / requirements).")
+        }
+    }
+
     override fun name(): String = "backlog"
+
+    private companion object {
+        const val IDLE_LOG_INTERVAL_MS = 30_000L
+    }
 }
