@@ -31,6 +31,10 @@ internal class ChopAndBankTask(
     }
 
     private fun chop() {
+        if (Bank.isOpen()) {
+            Bank.close() // never walk/chop with the bank interface open — it blocks walking
+            return
+        }
         if (MyPlayer.isAnimating()) return // already chopping
 
         val allowed = allowedTrees()
@@ -47,7 +51,15 @@ internal class ChopAndBankTask(
             .orElse(null)
 
         if (tree == null) {
-            chopSpot?.let { Walker.walkTo(it) } // returned from banking — head back to the trees
+            val spot = chopSpot
+            if (spot == null) {
+                Log.warn("No tree reachable and no chop spot remembered — start at the trees.")
+                return
+            }
+            Log.info("No tree reachable here — walking back to the chop spot $spot")
+            if (!Walker.walkTo(spot)) {
+                Log.warn("Walk back to the chop spot did not complete (walker returned false).")
+            }
             return
         }
 
