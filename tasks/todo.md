@@ -200,6 +200,14 @@
 - [x] Watchdog (thin stall seam: CONTINUE/STOP on a no-progress window).
 - [x] 19 tests green (Requirements 6, Scheduler 7, Watchdog 3, + TreeType 3).
 - [ ] Deferred to persistence (Phase 4): BuildProfile + gson ProfileCodec + schema version.
-- [ ] Phase 3: refactor ChopAndBankTask → BuilderTask on this engine; bind GameView to SDK reads.
+
+## AIO Account Builder — Phase 3 (Woodcutting on the engine) — branch `account-builder-phase3` (stacked on Phase 2)
+- docs: aio-account-builder/phase-3-woodcutting-task/spec.md (+ phase-2-engine/handoff.md). Per-phase folders now.
+- [x] BuilderTask (TaskSpec + execute()); WoodcuttingTask (isComplete=level>=target; chop/bank moved from ChopAndBankTask).
+- [x] SdkGameView binds the GameView seam (skills via Skill.valueOf(name).getActualLevel; inventory; members via Worlds.getCurrent().map(World::isMembers)).
+- [x] MainBacklogTask drives BuilderScheduler; AccountBuilderScript wires it; ChopAndBankTask removed.
+- [x] Panel: "Target Woodcutting level" field. compile + 19 tests + fatJar + deploy green.
+- [ ] Pre-merge: /code-review max, then merge.
+- [ ] Live verify (Echo): chop→bank→repeat via the scheduler; stops at the target level.
 
 ## Phase 4 — Publish / distribution  (later / optional)

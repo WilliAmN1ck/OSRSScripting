@@ -1,5 +1,9 @@
 package com.osrsscripts.accountbuilder
 
+import com.osrsscripts.accountbuilder.engine.BuilderScheduler
+import com.osrsscripts.accountbuilder.runner.MainBacklogTask
+import com.osrsscripts.accountbuilder.task.WoodcuttingTask
+import com.osrsscripts.accountbuilder.view.SdkGameView
 import com.osrsscripts.core.task.TaskRunner
 import org.tribot.automation.TribotScript
 import org.tribot.automation.script.ScriptContext
@@ -23,7 +27,9 @@ class AccountBuilderScript : TribotScript {
         val panel = AccountBuilderPanel(woodcuttingLevel())
         context.sidebar.addSidebarTab(TAB_NAME, null, panel)
 
-        val runner = TaskRunner(listOf(ChopAndBankTask(panel::selectedTrees)))
+        val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel)
+        val scheduler = BuilderScheduler(listOf(woodcutting))
+        val runner = TaskRunner(listOf(MainBacklogTask(scheduler) { SdkGameView }))
         try {
             while (!Thread.currentThread().isInterrupted) {
                 // Shadow client-scheduled breaks: stay idle while on break.
