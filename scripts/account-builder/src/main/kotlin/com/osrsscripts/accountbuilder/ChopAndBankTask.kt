@@ -8,6 +8,7 @@ import org.tribot.script.sdk.MyPlayer
 import org.tribot.script.sdk.Waiting
 import org.tribot.script.sdk.query.Query
 import org.tribot.script.sdk.types.WorldTile
+import org.tribot.script.sdk.util.TribotRandom
 
 /**
  * Chop → bank loop. Cuts the nearest reachable tree among the user-selected, level-qualified
@@ -63,31 +64,32 @@ internal class ChopAndBankTask(
                 return
             }
         }
-        // A single depositAllExcept can race the game tick (only one item moves before we close), so
-        // deposit until nothing depositable remains — confirming the inventory is clear — then close.
-        var attempts = 0
-        while (hasDepositableItems() && attempts++ < MAX_DEPOSIT_ATTEMPTS) {
-            Bank.depositAllExcept(*KEEP)
-            Waiting.waitUntil(DEPOSIT_TIMEOUT_MS) { !hasDepositableItems() }
+        // Deposit every non-axe item type explicitly, each with a short, human-like gap. depositAll
+        // per item id is fast and reliably clears *all* types (logs plus any stray pickaxe/arrows),
+        // unlike depositAllExcept which moved only one type per call.
+        val depositIds = Query.inventory()
+            .filter { item -> KEEP.none { keep -> keep.equals(item.name, ignoreCase = true) } }
+            .toList()
+            .map { it.id }
+            .distinct()
+        for (id in depositIds) {
+            Bank.depositAll(id)
+            Waiting.wait(TribotRandom.uniform(DEPOSIT_GAP_MIN_MS, DEPOSIT_GAP_MAX_MS))
         }
         Bank.close()
+        Waiting.waitUntil(CLOSE_TIMEOUT_MS) { !Bank.isOpen() } // confirm closed before we walk off
     }
 
-    /** Whether the inventory still holds anything other than a kept axe (i.e. logs/junk to bank). */
-    private fun hasDepositableItems(): Boolean =
-        Query.inventory()
-            .filter { item -> KEEP.none { keep -> keep.equals(item.name, ignoreCase = true) } }
-            .isAny
-
     private companion object {
-        // Keep any axe; deposit everything else (logs, junk).
+        // Keep any axe; deposit everything else (logs, junk, stray tools/ammo).
         val KEEP = arrayOf(
             "Bronze axe", "Iron axe", "Steel axe", "Black axe",
             "Mithril axe", "Adamant axe", "Rune axe", "Dragon axe",
         )
 
         const val CHOP_TIMEOUT_MS = 8_000
-        const val MAX_DEPOSIT_ATTEMPTS = 5
-        const val DEPOSIT_TIMEOUT_MS = 2_000
+        const val DEPOSIT_GAP_MIN_MS = 20
+        const val DEPOSIT_GAP_MAX_MS = 80
+        const val CLOSE_TIMEOUT_MS = 2_000
     }
 }
