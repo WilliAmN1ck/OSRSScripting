@@ -4,7 +4,7 @@
 **Date:** 2026-06-13
 **Branch:** `buy-trend-guard`
 **Spec:** [`spec.md`](./spec.md)
-**Status:** ✅ Code complete, unit-tested, reviewed (1 self-finding fixed). Live soak pending.
+**Status:** ✅ Code complete, unit-tested, reviewed (1 self-finding fixed). Verified live 2026-06-13.
 
 ---
 
@@ -45,7 +45,7 @@ average passes on the 5-minute). `WikiPriceClientTest.parsesFiveMinuteStats`. `F
 fetch failure still places the buy (degrades, doesn't skip). Full suite + `fatJar` green.
 
 ## Known Issues / Tech Debt
-- Live soak pending: confirm it skips a clearly falling item and still fills slots normally.
+- Verified live 2026-06-13: skips a clearly falling item and still fills slots normally.
 - Dynamic bid (bidding above the live low to fill faster) intentionally left out — trades margin for
   speed; a possible opt-in later.
 

@@ -41,8 +41,8 @@
 
 ## What Changed From the Spec
 
-- Nothing material. The spec's "sell `transferredGold` assumed post-tax" note remains the one
-  open live-verification (see Known Issues).
+- Nothing material. The spec's "sell `transferredGold` assumed post-tax" note was the one open
+  live-verification; confirmed live 2026-06-13 (see Known Issues).
 
 ## Files Changed (key)
 
@@ -65,8 +65,8 @@ clear-persists-on-fetch-failure), `FlipperPanelTest` (history table, Clear callb
 
 ## Known Issues / Tech Debt
 
-- **Sell `transferredGold` is assumed post-tax.** Not yet hand-verified against a live sell's
-  actual profit delta — still the one open item carried forward.
+- **Sell `transferredGold` is assumed post-tax.** ✅ Verified live 2026-06-13 against a live sell's
+  actual profit delta — the assumption holds. No open items remain.
 
 ## Verification Commands
 

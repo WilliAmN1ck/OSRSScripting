@@ -3,7 +3,7 @@
 
 **Date:** 2026-06-13
 **Branch:** `dynamic-bid`
-**Status:** ✅ Code complete, tested, reviewed (0 findings). Live soak pending.
+**Status:** ✅ Code complete, tested, reviewed (0 findings). Verified live 2026-06-13.
 
 ## What Was Built
 
@@ -38,7 +38,7 @@ buy price already reflect what will actually be paid.
 - Full suite + `fatJar` green.
 
 ## Known Issues / Tech Debt
-- Live soak pending: confirm buys fill faster without a noticeable margin hit. The 5% `BID_FRACTION`
+- Verified live 2026-06-13: buys fill faster without a noticeable margin hit. The 5% `BID_FRACTION`
   is the dial if it needs tuning.
 
 ## Verification Commands
