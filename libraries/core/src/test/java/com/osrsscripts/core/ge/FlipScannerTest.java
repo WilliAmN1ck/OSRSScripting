@@ -21,6 +21,9 @@ class FlipScannerTest {
     private final FlipScanner scanner = new FlipScanner();
     private final Instant t = Instant.parse("2026-06-11T12:00:00Z");
 
+    /** No five-minute data: the scanner uses the hour averages and applies no downtrend guard. */
+    private static final Map<Integer, MarketStat> NO_5M = Map.of();
+
     private Map<Integer, ItemMeta> mapping() {
         Map<Integer, ItemMeta> m = new HashMap<>();
         m.put(100, new ItemMeta(100, "A", false, 1000));
@@ -49,7 +52,7 @@ class FlipScannerTest {
     @Test
     void rejectsNonPositiveMarginAndMissingData() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), NO_5M, config, tax);
         assertEquals(2, result.size());
         assertTrue(result.stream().noneMatch(c -> c.itemId() == 300));
     }
@@ -66,7 +69,7 @@ class FlipScannerTest {
         h.put(1, new MarketStat(1100, 1000, 4000, 10));
         FlipConfig config = FlipConfig.builder().minMarginGp(1).minVolume(1000).build();
 
-        assertTrue(scanner.scan(m, p, h, config, tax).isEmpty());
+        assertTrue(scanner.scan(m, p, h, NO_5M, config, tax).isEmpty());
     }
 
     @Test
@@ -81,7 +84,7 @@ class FlipScannerTest {
         h.put(1, new MarketStat(1010, 1000, 5000, 5000)); // real hour: margin < 0 after tax
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
 
-        assertTrue(scanner.scan(m, p, h, config, tax).isEmpty());
+        assertTrue(scanner.scan(m, p, h, NO_5M, config, tax).isEmpty());
     }
 
     @Test
@@ -95,7 +98,7 @@ class FlipScannerTest {
         h.put(1, new MarketStat(1200, 1000, 5000, 5000)); // averaged decision prices
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
 
-        FlipCandidate c = scanner.scan(m, p, h, config, tax).get(0);
+        FlipCandidate c = scanner.scan(m, p, h, NO_5M, config, tax).get(0);
         assertEquals(995, c.buyPrice());   // live low, not avg 1000
         assertEquals(1205, c.sellPrice()); // live high, not avg 1200
     }
@@ -109,7 +112,61 @@ class FlipScannerTest {
         h.put(1, new MarketStat(1200, 1000, 5000, 5000));
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
 
-        assertTrue(scanner.scan(m, new HashMap<>(), h, config, tax).isEmpty());
+        assertTrue(scanner.scan(m, new HashMap<>(), h, NO_5M, config, tax).isEmpty());
+    }
+
+    @Test
+    void skipsAFallingKnifeWhoseFiveMinutePriceDroppedSharply() {
+        // The hour looks fine, but the 5-minute sell-side price is down ~6% (940 < 1000 x 0.95):
+        // a crash in progress, so the buy is skipped.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "crashing", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1100, t, 1000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1100, 1000, 5000, 5000));
+        Map<Integer, MarketStat> five = new HashMap<>();
+        five.put(1, new MarketStat(1040, 940, 200, 200));
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        assertTrue(scanner.scan(m, p, h, five, config, tax).isEmpty());
+    }
+
+    @Test
+    void aMildFiveMinuteDipDoesNotTripTheGuard() {
+        // Only ~4% down (960 > 1000 x 0.95): normal fluctuation, still a candidate.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "wobbling", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1100, t, 1000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1100, 1000, 5000, 5000));
+        Map<Integer, MarketStat> five = new HashMap<>();
+        five.put(1, new MarketStat(1100, 960, 200, 200));
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        List<FlipCandidate> result = scanner.scan(m, p, h, five, config, tax);
+        assertEquals(1, result.size());
+        assertEquals(1, result.get(0).itemId());
+    }
+
+    @Test
+    void usesTheFresherFiveMinuteAveragesForTheMarginWhenBothSidesTraded() {
+        // On the hour averages the spread is a post-tax loss (margin -10) and would be rejected; the
+        // fresher 5-minute averages show a healthy spread, so it qualifies.
+        Map<Integer, ItemMeta> m = new HashMap<>();
+        m.put(1, new ItemMeta(1, "recovering", false, 1000));
+        Map<Integer, PricePoint> p = new HashMap<>();
+        p.put(1, new PricePoint(1100, t, 1000, t));
+        Map<Integer, MarketStat> h = new HashMap<>();
+        h.put(1, new MarketStat(1010, 1000, 5000, 5000)); // hour: margin -10 -> would reject
+        Map<Integer, MarketStat> five = new HashMap<>();
+        five.put(1, new MarketStat(1100, 1000, 300, 300)); // 5m: margin 78 -> qualifies
+        FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
+
+        List<FlipCandidate> result = scanner.scan(m, p, h, five, config, tax);
+        assertEquals(1, result.size());
+        assertEquals(1, result.get(0).itemId());
     }
 
     @Test
@@ -128,7 +185,7 @@ class FlipScannerTest {
         FlipConfig config = FlipConfig.builder()
                 .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
 
-        List<FlipCandidate> result = scanner.scan(m, p, h, config, tax);
+        List<FlipCandidate> result = scanner.scan(m, p, h, NO_5M, config, tax);
 
         assertEquals(1, result.get(0).itemId(), "the faster, higher gp/hr item ranks first");
         assertEquals(2, result.get(1).itemId());
@@ -151,7 +208,7 @@ class FlipScannerTest {
         FlipConfig config = FlipConfig.builder()
                 .minMarginGp(1).perItemCapitalCap(Long.MAX_VALUE).build();
 
-        List<FlipCandidate> result = scanner.scan(m, p, h, config, tax);
+        List<FlipCandidate> result = scanner.scan(m, p, h, NO_5M, config, tax);
 
         assertEquals(2, result.get(0).itemId(), "equal gp/hr -> the capital-heavier offer first");
         assertEquals(1, result.get(1).itemId());
@@ -160,7 +217,7 @@ class FlipScannerTest {
     @Test
     void appliesVolumeFloor() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).minVolume(200).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), NO_5M, config, tax);
         assertEquals(1, result.size());
         assertEquals(100, result.get(0).itemId()); // 200 has balanced 50 < 200
     }
@@ -168,7 +225,7 @@ class FlipScannerTest {
     @Test
     void excludesMembersItemsWhenDisallowed() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).membersItemsAllowed(false).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), NO_5M, config, tax);
         assertEquals(1, result.size());
         assertEquals(100, result.get(0).itemId());
     }
@@ -176,14 +233,14 @@ class FlipScannerTest {
     @Test
     void includesMembersItemsByDefault() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), NO_5M, config, tax);
         assertTrue(result.stream().anyMatch(c -> c.itemId() == 200));
     }
 
     @Test
     void appliesRoiFloor() {
         FlipConfig config = FlipConfig.builder().minMarginGp(1).minMarginPct(0.05).build();
-        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), config, tax);
+        List<FlipCandidate> result = scanner.scan(mapping(), latest(), hourly(), NO_5M, config, tax);
         assertEquals(1, result.size());
         assertEquals(100, result.get(0).itemId()); // roi .078 passes; 200 roi .029 fails
     }

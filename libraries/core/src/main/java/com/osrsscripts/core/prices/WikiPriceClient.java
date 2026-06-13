@@ -34,6 +34,8 @@ public final class WikiPriceClient {
     private Instant latestFetchedAt;
     private Map<Integer, MarketStat> cachedHourly;
     private Instant hourlyFetchedAt;
+    private Map<Integer, MarketStat> cachedFiveMinute;
+    private Instant fiveMinuteFetchedAt;
 
     public WikiPriceClient(HttpFetcher fetcher, Clock clock, String baseUrl,
                            Duration liveTtl, Duration mappingTtl) {
@@ -94,7 +96,23 @@ public final class WikiPriceClient {
         if (fresh(hourlyFetchedAt, liveTtl)) {
             return cachedHourly;
         }
-        JsonNode data = mapper.readTree(fetcher.get(baseUrl + "/1h")).path("data");
+        cachedHourly = parseStats("/1h");
+        hourlyFetchedAt = clock.instant();
+        return cachedHourly;
+    }
+
+    /** Averaged prices and trade volumes over the trailing five minutes, keyed by item id. */
+    public Map<Integer, MarketStat> fiveMinuteStats() throws IOException {
+        if (fresh(fiveMinuteFetchedAt, liveTtl)) {
+            return cachedFiveMinute;
+        }
+        cachedFiveMinute = parseStats("/5m");
+        fiveMinuteFetchedAt = clock.instant();
+        return cachedFiveMinute;
+    }
+
+    private Map<Integer, MarketStat> parseStats(String path) throws IOException {
+        JsonNode data = mapper.readTree(fetcher.get(baseUrl + path)).path("data");
         Map<Integer, MarketStat> result = new HashMap<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
         while (fields.hasNext()) {
@@ -105,8 +123,6 @@ public final class WikiPriceClient {
                     n.path("avgLowPrice").asLong(0), n.path("highPriceVolume").asLong(0),
                     n.path("lowPriceVolume").asLong(0)));
         }
-        cachedHourly = result;
-        hourlyFetchedAt = clock.instant();
         return result;
     }
 

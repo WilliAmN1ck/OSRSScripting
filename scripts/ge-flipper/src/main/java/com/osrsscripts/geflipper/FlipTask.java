@@ -127,6 +127,13 @@ public final class FlipTask implements Task {
             // Transient market-data failure: skip this tick, try again next loop.
             return;
         }
+        Map<Integer, MarketStat> fiveMinute;
+        try {
+            fiveMinute = prices.fiveMinuteStats();
+        } catch (IOException e) {
+            // The 5-minute window only refines pricing/trend; degrade to hourly, never skip a tick.
+            fiveMinute = Map.of();
+        }
 
         Instant now = Instant.now();
         FlipConfig currentConfig = config.get();
@@ -143,7 +150,8 @@ public final class FlipTask implements Task {
         }
         AccountState account =
                 new AccountState(client.coins(), offers, sellableStock(mapping, currentConfig));
-        List<FlipCandidate> candidates = scanner.scan(mapping, latest, hourly, currentConfig, tax);
+        List<FlipCandidate> candidates =
+                scanner.scan(mapping, latest, hourly, fiveMinute, currentConfig, tax);
         // History has the final word: items that keep losing money stop being candidates.
         candidates.removeIf(
                 c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
