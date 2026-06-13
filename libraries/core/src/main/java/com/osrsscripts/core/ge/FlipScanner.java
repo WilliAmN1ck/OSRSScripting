@@ -27,9 +27,6 @@ public final class FlipScanner {
     /** A 4-hour buy limit spread over the hours the rate is measured in. */
     private static final double BUY_LIMIT_HOURS = 4.0;
 
-    /** Skip a buy when the 5-minute average has fallen this far below the hour — a falling knife. */
-    private static final double DOWNTREND_DROP = 0.05;
-
     /** Bid this fraction of an item's margin above the live low, so buys fill a little faster. */
     private static final double BID_FRACTION = 0.05;
 
