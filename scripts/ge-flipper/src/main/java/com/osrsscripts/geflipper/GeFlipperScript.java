@@ -135,7 +135,14 @@ public final class GeFlipperScript implements TribotScript {
                 Instant now = Instant.now();
                 Optional<Duration> lookAway = afk.pollAt(now);
                 if (lookAway.isPresent()) {
-                    context.getWaiting().sleep(lookAway.get().toMillis()); // attention wandered
+                    // Attention wandered: idle for the look-away, but in chunks so a Stop (and the
+                    // final save) is not held up for the whole 20-90s.
+                    long remaining = lookAway.get().toMillis();
+                    while (remaining > 0 && !Thread.currentThread().isInterrupted()) {
+                        long chunk = Math.min(remaining, 1_000L);
+                        context.getWaiting().sleep(chunk);
+                        remaining -= chunk;
+                    }
                     continue;
                 }
                 runner.tick();
