@@ -1,5 +1,6 @@
 package com.osrsscripts.geflipper;
 
+import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.model.FlipConfig;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -60,6 +61,7 @@ public final class FlipperPanel extends JPanel {
     private final JButton clearHistoryButton = new JButton("Clear history");
     private final JLabel errorLabel = new JLabel(" ");
     private final JTextArea statsArea = new JTextArea(8, 24);
+    private final JLabel advisoryLabel = new JLabel(" ");
     private final DefaultTableModel historyModel = new DefaultTableModel(HISTORY_COLUMNS, 0) {
         @Override
         public boolean isCellEditable(int row, int column) {
@@ -119,6 +121,9 @@ public final class FlipperPanel extends JPanel {
         statsArea.setEditable(false);
         statsArea.setOpaque(false);
         stats.add(statsArea, BorderLayout.CENTER);
+        // Amber advisory shown only when a config setting is keeping GE slots or gold idle.
+        advisoryLabel.setForeground(new Color(0xB36B00));
+        stats.add(advisoryLabel, BorderLayout.SOUTH);
 
         JPanel history = new JPanel(new BorderLayout(0, 4));
         history.setBorder(BorderFactory.createTitledBorder("Trade history"));
@@ -236,14 +241,43 @@ public final class FlipperPanel extends JPanel {
         for (String line : snapshot.offerLines()) {
             text.append("  ").append(line).append('\n');
         }
+        String advisory = advisory(snapshot.idleReason());
         SwingUtilities.invokeLater(() -> {
             statsArea.setText(text.toString());
+            // Wrap in HTML so the sidebar's narrow column flows the advisory onto several lines
+            // instead of clipping it to an unreadable "lower 'Min …".
+            advisoryLabel.setText(advisory.isEmpty() ? " " : "<html>" + advisory + "</html>");
             historyModel.setRowCount(0);
             for (StatsSnapshot.TradeRow row : snapshot.tradeRows()) {
                 historyModel.addRow(new Object[] {row.itemName(), gp(row.netProfit()),
                         row.flipsCompleted(), row.qtySold()});
             }
         });
+    }
+
+    /**
+     * The advisory to show when a config setting is leaving GE slots or gold idle: which setting,
+     * and which way to move it. Empty when nothing is being wasted (or the cause is the market or
+     * an empty wallet, neither of which a setting can fix).
+     */
+    private static String advisory(IdleReason reason) {
+        switch (reason) {
+            case MAX_SLOTS:
+                return "GE slots sit idle — raise \"" + Field.MAX_SLOTS.label
+                        + "\" to use them.";
+            case CAPITAL_CAP:
+                return "Capital cap reached — raise \"" + Field.CAPITAL_CAP.label
+                        + "\" to deploy more gold.";
+            case PER_ITEM_CAP:
+                return "Per-item cap is limiting buys — raise \"" + Field.PER_ITEM_CAPITAL_CAP.label
+                        + "\" or loosen filters for more items.";
+            case NO_CANDIDATES:
+                return "No items pass your filters — lower \"" + Field.MIN_MARGIN_GP.label
+                        + "\" or \"" + Field.MIN_VOLUME.label + "\".";
+            case NONE:
+            default:
+                return "";
+        }
     }
 
     private static String formatRuntime(Duration runtime) {
@@ -284,5 +318,9 @@ public final class FlipperPanel extends JPanel {
 
     String statsText() {
         return statsArea.getText();
+    }
+
+    String advisoryText() {
+        return advisoryLabel.getText();
     }
 }

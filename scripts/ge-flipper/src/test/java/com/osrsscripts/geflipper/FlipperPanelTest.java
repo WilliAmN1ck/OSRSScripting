@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.model.FlipConfig;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -111,7 +112,8 @@ class FlipperPanelTest {
         panel.update(new StatsSnapshot(Duration.ofMinutes(90), 470L, 12_470L, 3L, 250_000L,
                 List.of("1 BUY Test item 4/10 @ 100"),
                 List.of(new StatsSnapshot.TradeRow("Raw pike", 12L, 1, 2),
-                        new StatsSnapshot.TradeRow("Gold bar", -300L, 2, 6))));
+                        new StatsSnapshot.TradeRow("Gold bar", -300L, 2, 6)),
+                IdleReason.NONE));
         // update marshals onto the EDT; wait for it to drain before asserting.
         SwingUtilities.invokeAndWait(() -> { });
 
@@ -121,6 +123,20 @@ class FlipperPanelTest {
         assertTrue(panel.statsText().contains("250,000"), "cash shown");
         assertTrue(panel.statsText().contains("Test item"), "offer line shown");
         assertEquals(2, panel.historyRowCount(), "trade history table populated");
+        assertEquals(" ", panel.advisoryText(), "no advisory when nothing is wasted");
+    }
+
+    @Test
+    void idleReasonSurfacesAnActionableAdvisory() throws InterruptedException,
+            InvocationTargetException {
+        FlipperPanel panel = new FlipperPanel(initial(), config -> { }, () -> { });
+
+        panel.update(new StatsSnapshot(Duration.ZERO, 0L, 0L, 0L, 0L, List.of(), List.of(),
+                IdleReason.MAX_SLOTS));
+        SwingUtilities.invokeAndWait(() -> { });
+
+        assertTrue(panel.advisoryText().contains("Max GE slots"),
+                "advisory names the setting to change");
     }
 
     @Test

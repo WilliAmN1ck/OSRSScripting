@@ -5,6 +5,7 @@ import com.osrsscripts.core.ge.FlipEngine;
 import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.GeTaxRules;
+import com.osrsscripts.core.ge.IdleReason;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.ge.TradeHistory;
@@ -96,11 +97,12 @@ public final class GeFlipperScript implements TribotScript {
                 new DelayDistribution(FIDGET_MIN_MS, FIDGET_MAX_MS, random),
                 new SdkFidget(context, random));
 
+        FlipTask flipTask = new FlipTask(client, prices, scanner, engine, tax, ledger, stock,
+                tracker, history, config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle,
+                clearHistoryRequest);
         List<Task> tasks = List.of(
                 new BreakIdleTask(new SdkBreakSource(context.getSidecars())),
-                new FlipTask(client, prices, scanner, engine, tax, ledger, stock, tracker,
-                        history, config::get, executor, persister, PLACEMENT_RETRY_BACKOFF, idle,
-                        clearHistoryRequest));
+                flipTask);
         TaskRunner runner = new TaskRunner(tasks);
 
         Instant startedAt = Instant.now();
@@ -108,7 +110,7 @@ public final class GeFlipperScript implements TribotScript {
             while (!Thread.currentThread().isInterrupted()) {
                 runner.tick();
                 refreshStats(panel, client, tracker, history, prices, profitBaseline, startedAt,
-                        context);
+                        context, flipTask.idleReason());
                 context.getWaiting().sleep(TICK_INTERVAL_MS);
             }
         } finally {
@@ -122,7 +124,7 @@ public final class GeFlipperScript implements TribotScript {
     private static void refreshStats(FlipperPanel panel, GeClient client, OfferTracker tracker,
                                      TradeHistory history, WikiPriceClient prices,
                                      long profitBaseline, Instant startedAt,
-                                     ScriptContext context) {
+                                     ScriptContext context, IdleReason idleReason) {
         try {
             List<String> offerLines = new ArrayList<>();
             for (GeOffer offer : client.offers()) {
@@ -139,7 +141,8 @@ public final class GeFlipperScript implements TribotScript {
                     tracker.flipsCompleted(),
                     client.coins(),
                     offerLines,
-                    tradeRows(history, prices)));
+                    tradeRows(history, prices),
+                    idleReason));
         } catch (RuntimeException e) {
             context.getLogger().warn("Skipping stats refresh", e);
         }

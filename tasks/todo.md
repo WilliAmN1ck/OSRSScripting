@@ -52,4 +52,17 @@
 - [x] Live visual check of 3d features: GE auto-close ✓, fidgets ✓ (tab glances observed), break profile loaded ✓, new panel fields render ✓
 - [ ] Live-verify: sell transferredGold assumed post-tax — compare a live sell's profit delta vs hand math
 
+## Slot/capital diagnostics — branch `flipper-slot-utilization` (2026-06-12)
+- [x] Investigated "idle slots / unused cash": same-item reuse can't deploy more (per-item cap & 4h
+      limit are totals a single offer already maxes). User chose: drop reuse, keep the diagnostic.
+- [x] FlipEngine.plan() → FlipPlan(actions, IdleReason); decide() delegates. One offer per item kept.
+- [x] IdleReason {NONE, MAX_SLOTS, CAPITAL_CAP, PER_ITEM_CAP, NO_CANDIDATES} computed from the tick's
+      free slots / capacity / budget / candidate presence
+- [x] FlipTask exposes idleReason(); GeFlipperScript feeds it into StatsSnapshot
+- [x] FlipperPanel amber advisory naming the setting to change (e.g. "raise Max GE slots")
+- [x] Tests: 5 plan() reason cases (core) + panel advisory render; full suite + fatJar green
+- [x] Live-verified on Echo: advisory renders amber, reason NO_CANDIDATES correct; HTML-wrap readable
+- [x] /code-review max (1 import-order nit fixed; no correctness bugs)
+- [ ] commit; PR
+
 ## Phase 4 — Publish / distribution  (later / optional)

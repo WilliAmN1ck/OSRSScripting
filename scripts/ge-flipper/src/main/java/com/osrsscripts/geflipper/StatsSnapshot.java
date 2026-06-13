@@ -1,5 +1,6 @@
 package com.osrsscripts.geflipper;
 
+import com.osrsscripts.core.ge.IdleReason;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,10 +17,11 @@ public final class StatsSnapshot {
     private final long cash;
     private final List<String> offerLines;
     private final List<TradeRow> tradeRows;
+    private final IdleReason idleReason;
 
     public StatsSnapshot(Duration runtime, long sessionProfit, long allTimeProfit,
                          long flipsCompleted, long cash, List<String> offerLines,
-                         List<TradeRow> tradeRows) {
+                         List<TradeRow> tradeRows, IdleReason idleReason) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.sessionProfit = sessionProfit;
         this.allTimeProfit = allTimeProfit;
@@ -27,6 +29,7 @@ public final class StatsSnapshot {
         this.cash = cash;
         this.offerLines = Collections.unmodifiableList(new ArrayList<>(offerLines));
         this.tradeRows = Collections.unmodifiableList(new ArrayList<>(tradeRows));
+        this.idleReason = Objects.requireNonNull(idleReason, "idleReason");
     }
 
     public Duration runtime() {
@@ -55,6 +58,10 @@ public final class StatsSnapshot {
 
     public List<TradeRow> tradeRows() {
         return tradeRows;
+    }
+
+    public IdleReason idleReason() {
+        return idleReason;
     }
 
     /** One trade-history table row, best net profit first. */
