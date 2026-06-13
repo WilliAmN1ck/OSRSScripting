@@ -2,6 +2,7 @@ package com.osrsscripts.accountbuilder
 
 import com.osrsscripts.accountbuilder.engine.BuilderScheduler
 import com.osrsscripts.accountbuilder.engine.Watchdog
+import com.osrsscripts.accountbuilder.engine.profile.ProfileStore
 import com.osrsscripts.accountbuilder.runner.MainBacklogTask
 import com.osrsscripts.accountbuilder.task.WoodcuttingTask
 import com.osrsscripts.accountbuilder.view.SdkGameView
@@ -14,6 +15,7 @@ import org.tribot.automation.script.ScriptContext
 import org.tribot.script.sdk.Login
 import org.tribot.script.sdk.Skill
 import org.tribot.script.sdk.antiban.Antiban
+import org.tribot.script.sdk.util.ScriptSettings
 import java.time.Duration
 import java.time.Instant
 import java.util.Random
@@ -33,7 +35,9 @@ class AccountBuilderScript : TribotScript {
         // Echo's built-in action humanization.
         Antiban.setScriptAiAntibanEnabled(true)
 
+        val store = ProfileStore(ScriptSettings.getDefault().directory.toPath().resolve(PROFILE_FILE))
         val panel = AccountBuilderPanel(woodcuttingLevel())
+        panel.applyProfile(store.load()) // restore the saved tree selection + target level
         context.sidebar.addSidebarTab(TAB_NAME, null, panel)
 
         val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel)
@@ -46,6 +50,7 @@ class AccountBuilderScript : TribotScript {
         val cadence = DelayDistribution(CADENCE_MIN_MS, CADENCE_MAX_MS, random)
         val afk = AfkScheduler(startedAt, random, AFK_MIN_GAP, AFK_MAX_GAP, AFK_MIN, AFK_MAX)
         val watchdog = Watchdog(STALL_LIMIT_MS)
+        var lastSavedProfile = panel.toProfile()
 
         try {
             while (!Thread.currentThread().isInterrupted) {
@@ -91,6 +96,13 @@ class AccountBuilderScript : TribotScript {
 
                 // Re-gate the tree checkboxes as Woodcutting levels up during the run.
                 panel.setWoodcuttingLevel(woodcuttingLevel())
+                // Persist config changes (tree selection / target) as the user makes them.
+                val profile = panel.toProfile()
+                if (profile != lastSavedProfile) {
+                    runCatching { store.save(profile) }
+                        .onFailure { context.logger.warn("Failed to save profile", it) }
+                    lastSavedProfile = profile
+                }
                 runner.tick()
                 context.waiting.sleep(Math.round(cadence.nextMs() * fatigue.multiplierAt(now)))
             }
@@ -107,6 +119,7 @@ class AccountBuilderScript : TribotScript {
 
     private companion object {
         const val TAB_NAME = "Account Builder"
+        const val PROFILE_FILE = "account-builder-profile.json"
         const val IDLE_POLL_MS = 2_000L
         const val CADENCE_MIN_MS = 400L
         const val CADENCE_MAX_MS = 900L
