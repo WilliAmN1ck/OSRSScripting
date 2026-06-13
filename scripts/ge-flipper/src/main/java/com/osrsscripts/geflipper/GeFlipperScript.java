@@ -16,6 +16,7 @@ import com.osrsscripts.core.humanize.FidgetSelector;
 import com.osrsscripts.core.model.FlipConfig;
 import com.osrsscripts.core.model.GeOffer;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.OfferSide;
 import com.osrsscripts.core.persistence.PersistedState;
 import com.osrsscripts.core.persistence.StateMapper;
 import com.osrsscripts.core.persistence.StateStore;
@@ -147,7 +148,7 @@ public final class GeFlipperScript implements TribotScript {
                 }
                 runner.tick();
                 refreshStats(panel, client, tracker, history, prices, profitBaseline, startedAt,
-                        context, flipTask.idleReason());
+                        context, flipTask.idleReason(), config.get().avoidAfterLossGp());
                 context.getWaiting().sleep(Math.round(cadence.nextMs() * fatigue.multiplierAt(now)));
             }
         } finally {
@@ -161,14 +162,26 @@ public final class GeFlipperScript implements TribotScript {
     private static void refreshStats(FlipperPanel panel, GeClient client, OfferTracker tracker,
                                      TradeHistory history, WikiPriceClient prices,
                                      long profitBaseline, Instant startedAt,
-                                     ScriptContext context, IdleReason idleReason) {
+                                     ScriptContext context, IdleReason idleReason,
+                                     long lossAvoidThresholdGp) {
         try {
             List<String> offerLines = new ArrayList<>();
+            long openBuyCapital = 0L;
             for (GeOffer offer : client.offers()) {
-                if (!offer.isEmpty()) {
-                    offerLines.add(offer.slot() + " " + offer.side() + " item " + offer.itemId()
-                            + " " + offer.filled() + "/" + offer.quantity()
-                            + " @ " + offer.pricePerItem());
+                if (offer.isEmpty()) {
+                    continue;
+                }
+                offerLines.add(offer.slot() + " " + offer.side() + " item " + offer.itemId()
+                        + " " + offer.filled() + "/" + offer.quantity()
+                        + " @ " + offer.pricePerItem());
+                if (offer.side() == OfferSide.BUY) {
+                    openBuyCapital += (long) offer.pricePerItem() * offer.quantity();
+                }
+            }
+            int itemsAvoided = 0;
+            for (TradeHistory.ItemRecord record : history.records()) {
+                if (history.shouldAvoid(record.itemId(), lossAvoidThresholdGp)) {
+                    itemsAvoided++;
                 }
             }
             panel.update(new StatsSnapshot(
@@ -177,8 +190,10 @@ public final class GeFlipperScript implements TribotScript {
                     tracker.realizedProfit(),
                     tracker.flipsCompleted(),
                     client.coins(),
+                    openBuyCapital,
                     offerLines,
                     tradeRows(history, prices),
+                    itemsAvoided,
                     idleReason));
         } catch (RuntimeException e) {
             context.getLogger().warn("Skipping stats refresh", e);
