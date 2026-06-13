@@ -98,7 +98,8 @@
 - [x] Phase C — cadence (1.5-3.5s x fatigue) + AFK poll in loop; reaction beat in executor (C2).
       C3 active-flip fidget DEFERRED (idle path already covers the waits; GE-open fidget risk →
       validate fidgets live first).
-- [ ] Phase D — /code-review, live soak (fidgets fire, an AFK, clean breaks, zero disrupted flips),
-      handoff + PR
+- [x] Phase D — /code-review max (0 findings); handoff written; PR. Live fidget/AFK soak still
+      pending a clean flipping window (driven attempt hit a scheduled ~47-min Echo break, which
+      incidentally confirmed break-shadowing works — flipper stayed idle while logged out).
 
 ## Phase 4 — Publish / distribution  (later / optional)
