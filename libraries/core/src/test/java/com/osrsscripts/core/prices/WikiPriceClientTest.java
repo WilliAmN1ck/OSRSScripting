@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.osrsscripts.core.model.ItemMeta;
 import com.osrsscripts.core.model.PricePoint;
-import com.osrsscripts.core.model.VolumePoint;
+import com.osrsscripts.core.model.MarketStat;
 import com.osrsscripts.core.testutil.AdjustableClock;
 import java.io.IOException;
 import java.time.Duration;
@@ -73,15 +73,16 @@ class WikiPriceClientTest {
     }
 
     @Test
-    void parsesOneHourVolumes() throws IOException {
+    void parsesOneHourStats() throws IOException {
         CountingFetcher fetcher = new CountingFetcher();
         fetcher.bodies.put("base/1h",
-                "{\"data\":{\"4151\":{\"highPriceVolume\":120,\"lowPriceVolume\":80}}}");
-        Map<Integer, VolumePoint> volumes =
-                client(fetcher, new AdjustableClock(Instant.EPOCH)).volumesOneHour();
+                "{\"data\":{\"4151\":{\"avgHighPrice\":2600,\"avgLowPrice\":2500,"
+                        + "\"highPriceVolume\":120,\"lowPriceVolume\":80}}}");
+        Map<Integer, MarketStat> hourly =
+                client(fetcher, new AdjustableClock(Instant.EPOCH)).hourlyStats();
 
-        assertEquals(new VolumePoint(120, 80), volumes.get(4151));
-        assertEquals(200, volumes.get(4151).total());
+        assertEquals(new MarketStat(2600, 2500, 120, 80), hourly.get(4151));
+        assertEquals(80, hourly.get(4151).balancedVolume());
     }
 
     @Test

@@ -3,8 +3,8 @@ package com.osrsscripts.core.prices;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.osrsscripts.core.model.ItemMeta;
+import com.osrsscripts.core.model.MarketStat;
 import com.osrsscripts.core.model.PricePoint;
-import com.osrsscripts.core.model.VolumePoint;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -32,8 +32,8 @@ public final class WikiPriceClient {
     private Instant mappingFetchedAt;
     private Map<Integer, PricePoint> cachedLatest;
     private Instant latestFetchedAt;
-    private Map<Integer, VolumePoint> cachedVolumes;
-    private Instant volumesFetchedAt;
+    private Map<Integer, MarketStat> cachedHourly;
+    private Instant hourlyFetchedAt;
 
     public WikiPriceClient(HttpFetcher fetcher, Clock clock, String baseUrl,
                            Duration liveTtl, Duration mappingTtl) {
@@ -89,23 +89,24 @@ public final class WikiPriceClient {
         return result;
     }
 
-    /** Trade volumes over the trailing hour, keyed by item id. */
-    public Map<Integer, VolumePoint> volumesOneHour() throws IOException {
-        if (fresh(volumesFetchedAt, liveTtl)) {
-            return cachedVolumes;
+    /** Averaged prices and trade volumes over the trailing hour, keyed by item id. */
+    public Map<Integer, MarketStat> hourlyStats() throws IOException {
+        if (fresh(hourlyFetchedAt, liveTtl)) {
+            return cachedHourly;
         }
         JsonNode data = mapper.readTree(fetcher.get(baseUrl + "/1h")).path("data");
-        Map<Integer, VolumePoint> result = new HashMap<>();
+        Map<Integer, MarketStat> result = new HashMap<>();
         Iterator<Map.Entry<String, JsonNode>> fields = data.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
             int id = Integer.parseInt(entry.getKey());
             JsonNode n = entry.getValue();
-            result.put(id, new VolumePoint(n.path("highPriceVolume").asLong(0),
+            result.put(id, new MarketStat(n.path("avgHighPrice").asLong(0),
+                    n.path("avgLowPrice").asLong(0), n.path("highPriceVolume").asLong(0),
                     n.path("lowPriceVolume").asLong(0)));
         }
-        cachedVolumes = result;
-        volumesFetchedAt = clock.instant();
+        cachedHourly = result;
+        hourlyFetchedAt = clock.instant();
         return result;
     }
 
