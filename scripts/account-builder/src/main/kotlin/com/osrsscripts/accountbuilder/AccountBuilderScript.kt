@@ -3,14 +3,15 @@ package com.osrsscripts.accountbuilder
 import com.osrsscripts.core.task.TaskRunner
 import org.tribot.automation.TribotScript
 import org.tribot.automation.script.ScriptContext
+import org.tribot.script.sdk.Skill
 import org.tribot.script.sdk.antiban.Antiban
 
 /**
  * Entry point for the AIO Account Builder.
  *
- * Phase 1 (vertical-slice proof): a single hardcoded chop → bank loop on the shared [TaskRunner],
- * exercising the SDK integration (Query, banking, walking, antiban, break shadowing) end-to-end
- * before the task engine is built. The engine, capability seams, and real tasks come in later phases
+ * Current slice: a Woodcutting chop → bank loop driven by a sidebar tree-selection panel
+ * ([AccountBuilderPanel]), on the shared [TaskRunner] with antiban + break shadowing. The task
+ * engine, capability seams, and the full task catalog come in later phases
  * (see docs/plans/aio-account-builder/plan.md).
  */
 class AccountBuilderScript : TribotScript {
@@ -19,19 +20,31 @@ class AccountBuilderScript : TribotScript {
         // Echo's built-in action humanization.
         Antiban.setScriptAiAntibanEnabled(true)
 
-        val runner = TaskRunner(listOf(ChopAndBankTask()))
-        while (!Thread.currentThread().isInterrupted) {
-            // Shadow client-scheduled breaks: stay idle (offers/skills tick passively) while on break.
-            if (context.sidecars.breakHandler.isOnBreak) {
-                context.waiting.sleep(BREAK_POLL_MS)
-                continue
+        val panel = AccountBuilderPanel(woodcuttingLevel())
+        context.sidebar.addSidebarTab(TAB_NAME, null, panel)
+
+        val runner = TaskRunner(listOf(ChopAndBankTask(panel::selectedTrees)))
+        try {
+            while (!Thread.currentThread().isInterrupted) {
+                // Shadow client-scheduled breaks: stay idle while on break.
+                if (context.sidecars.breakHandler.isOnBreak) {
+                    context.waiting.sleep(BREAK_POLL_MS)
+                    continue
+                }
+                // Re-gate the tree checkboxes as Woodcutting levels up during the run.
+                panel.setWoodcuttingLevel(woodcuttingLevel())
+                runner.tick()
+                context.waiting.sleep(LOOP_DELAY_MS)
             }
-            runner.tick()
-            context.waiting.sleep(LOOP_DELAY_MS)
+        } finally {
+            context.sidebar.removeSidebarTab(TAB_NAME)
         }
     }
 
+    private fun woodcuttingLevel(): Int = Skill.WOODCUTTING.getActualLevel()
+
     private companion object {
+        const val TAB_NAME = "Account Builder"
         const val LOOP_DELAY_MS = 600L
         const val BREAK_POLL_MS = 2_000L
     }

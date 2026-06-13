@@ -10,18 +10,17 @@ import org.tribot.script.sdk.query.Query
 import org.tribot.script.sdk.types.WorldTile
 
 /**
- * Phase 1 vertical-slice proof (intentionally throwaway): a single chop → bank loop that exercises
- * the SDK integration end-to-end — object [Query], interaction, banking, walking, and waits — before
- * the real task engine exists. Each step keys off observable game state (animating / inventory full /
- * bank reachable), so it is re-entrant and safe to interrupt.
- *
- * Targets only normal "Tree" objects (Woodcutting level 1) so any account can run it, and banks at
- * the nearest bank via the walker (handles obstacles/stairs), returning to the remembered chop spot.
+ * Chop → bank loop. Cuts the nearest reachable tree among the user-selected, level-qualified
+ * [TreeType]s (from the sidebar), banks at the nearest bank when full (walker handles obstacles /
+ * stairs), then returns to the remembered chop spot. Each step keys off observable game state
+ * (animating / inventory full / bank reachable), so it is re-entrant and safe to interrupt.
  */
-internal class ChopAndBankTask : Task {
+internal class ChopAndBankTask(
+    private val allowedTrees: () -> Set<TreeType>,
+) : Task {
 
-    // Captured the first time we chop, so we can walk back after banking — no hardcoded tiles, works
-    // wherever the user starts at the trees.
+    // Captured the first time we chop, so we can walk back after banking — works wherever the user
+    // starts at the trees, no hardcoded tiles.
     private var chopSpot: WorldTile? = null
 
     override fun shouldRun(): Boolean = true
@@ -33,20 +32,21 @@ internal class ChopAndBankTask : Task {
     private fun chop() {
         if (MyPlayer.isAnimating()) return // already chopping
 
+        val allowed = allowedTrees()
+        if (allowed.isEmpty()) {
+            Log.warn("No tree types selected within your Woodcutting level — pick one in the sidebar.")
+            return
+        }
+
         val tree = Query.gameObjects()
-            .nameEquals(TREE_NAME)
             .actionEquals("Chop down")
+            .filter { obj -> allowed.any { it.matches(obj.name) } }
             .isReachable
             .findClosest()
             .orElse(null)
 
         if (tree == null) {
-            val spot = chopSpot
-            if (spot != null) {
-                Walker.walkTo(spot) // returned from banking — head back to the trees
-            } else {
-                Log.warn("No '$TREE_NAME' reachable and no chop spot remembered — start at the trees.")
-            }
+            chopSpot?.let { Walker.walkTo(it) } // returned from banking — head back to the trees
             return
         }
 
@@ -68,9 +68,6 @@ internal class ChopAndBankTask : Task {
     }
 
     private companion object {
-        // Normal trees only — Woodcutting level 1, so any account can chop them.
-        const val TREE_NAME = "Tree"
-
         // Keep any axe; deposit everything else (logs, junk).
         val KEEP = arrayOf(
             "Bronze axe", "Iron axe", "Steel axe", "Black axe",
