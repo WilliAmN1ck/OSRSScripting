@@ -178,4 +178,13 @@
 - [x] 0.3 Heartbeat AccountBuilderScript : TribotScript on a TaskRunner loop — compiles + fatJar green
 - [x] 0.4 fatJar + deployLocally produce account-builder.jar ("loads in Echo" = user verify)
 
+## AIO Account Builder — Phase 1 (thin live chop→bank loop) — branch `account-builder-phase1` (stacked on Phase 0)
+- [x] 1.1 ChopAndBankTask (chop nearest reachable "Chop down" → bank when full) + Walker (DentistWalker).
+      Re-entrant (keys off isAnimating/isFull/bank-reachable). Hardcoded Draynor willow+bank defaults.
+- [x] 1.2 AccountBuilderScript wires it on TaskRunner + Antiban + break-handler shadow. Removed HeartbeatTask.
+- [x] compileKotlin + fatJar green (validates all SDK signatures against the real plugin SDK)
+- [ ] Live verify in Echo (the Phase 1 acceptance gate): chops, fills inv, banks, repeats. NOT yet deployed
+      (heartbeat jar preserved for Phase 0 verify). Deploy when ready to test.
+- [ ] PR held: stacked on unmerged Phase 0 PR #21; open/retarget after #21 merges.
+
 ## Phase 4 — Publish / distribution  (later / optional)

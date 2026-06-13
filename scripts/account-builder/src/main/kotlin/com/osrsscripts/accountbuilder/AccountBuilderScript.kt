@@ -3,25 +3,49 @@ package com.osrsscripts.accountbuilder
 import com.osrsscripts.core.task.TaskRunner
 import org.tribot.automation.TribotScript
 import org.tribot.automation.script.ScriptContext
+import org.tribot.script.sdk.Skill
+import org.tribot.script.sdk.antiban.Antiban
 
 /**
  * Entry point for the AIO Account Builder.
  *
- * Phase 0 scaffold: a heartbeat loop on the shared [TaskRunner], proving the Kotlin module loads and
- * runs in Echo before the task engine is built on top of it. The engine, capability seams, and
- * behaviour-tree tasks are added in later phases (see docs/plans/aio-account-builder/plan.md).
+ * Current slice: a Woodcutting chop → bank loop driven by a sidebar tree-selection panel
+ * ([AccountBuilderPanel]), on the shared [TaskRunner] with antiban + break shadowing. The task
+ * engine, capability seams, and the full task catalog come in later phases
+ * (see docs/plans/aio-account-builder/plan.md).
  */
 class AccountBuilderScript : TribotScript {
 
     override fun execute(context: ScriptContext) {
-        val runner = TaskRunner(listOf(HeartbeatTask(context)))
-        while (!Thread.currentThread().isInterrupted) {
-            runner.tick()
-            context.waiting.sleep(HEARTBEAT_PERIOD_MS)
+        // Echo's built-in action humanization.
+        Antiban.setScriptAiAntibanEnabled(true)
+
+        val panel = AccountBuilderPanel(woodcuttingLevel())
+        context.sidebar.addSidebarTab(TAB_NAME, null, panel)
+
+        val runner = TaskRunner(listOf(ChopAndBankTask(panel::selectedTrees)))
+        try {
+            while (!Thread.currentThread().isInterrupted) {
+                // Shadow client-scheduled breaks: stay idle while on break.
+                if (context.sidecars.breakHandler.isOnBreak) {
+                    context.waiting.sleep(BREAK_POLL_MS)
+                    continue
+                }
+                // Re-gate the tree checkboxes as Woodcutting levels up during the run.
+                panel.setWoodcuttingLevel(woodcuttingLevel())
+                runner.tick()
+                context.waiting.sleep(LOOP_DELAY_MS)
+            }
+        } finally {
+            context.sidebar.removeSidebarTab(TAB_NAME)
         }
     }
 
+    private fun woodcuttingLevel(): Int = Skill.WOODCUTTING.getActualLevel()
+
     private companion object {
-        const val HEARTBEAT_PERIOD_MS = 2_000L
+        const val TAB_NAME = "Account Builder"
+        const val LOOP_DELAY_MS = 600L
+        const val BREAK_POLL_MS = 2_000L
     }
 }
