@@ -8,6 +8,7 @@ import com.osrsscripts.core.ge.FlipPlan;
 import com.osrsscripts.core.ge.FlipScanner;
 import com.osrsscripts.core.ge.GeTax;
 import com.osrsscripts.core.ge.IdleReason;
+import com.osrsscripts.core.ge.MarketTrend;
 import com.osrsscripts.core.ge.OfferTracker;
 import com.osrsscripts.core.ge.StockLedger;
 import com.osrsscripts.core.ge.TradeHistory;
@@ -28,10 +29,12 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -155,8 +158,16 @@ public final class FlipTask implements Task {
         // History has the final word: items that keep losing money stop being candidates.
         candidates.removeIf(
                 c -> history.shouldAvoid(c.itemId(), currentConfig.avoidAfterLossGp()));
-        FlipPlan plan =
-                engine.plan(candidates, latest, account, ledger, currentConfig, now, sellRelists);
+        // Held stock whose price is crashing in real time: dump at the insta-sell price this tick.
+        Set<Integer> crashingItems = new HashSet<>();
+        for (int itemId : account.stock().keySet()) {
+            if (MarketTrend.isFallingKnife(fiveMinute.get(itemId), hourly.get(itemId),
+                    MarketTrend.DEFAULT_DROP)) {
+                crashingItems.add(itemId);
+            }
+        }
+        FlipPlan plan = engine.plan(candidates, latest, account, ledger, currentConfig, now,
+                sellRelists, crashingItems);
         idleReason = plan.idleReason();
         List<FlipAction> actions = plan.actions();
         if (actions.isEmpty()) {

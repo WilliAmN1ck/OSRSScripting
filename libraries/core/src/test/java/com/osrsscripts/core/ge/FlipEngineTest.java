@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class FlipEngineTest {
@@ -291,6 +292,23 @@ class FlipEngineTest {
                 new BuyLimitLedger(), config(), now, Map.of(100, 99));
 
         assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1100, 50)), actions);
+    }
+
+    @Test
+    void crashingHeldItemExitsAtTheInstaSellPriceEvenWithoutStaleRelists() {
+        Map<Integer, PricePoint> prices = new HashMap<>();
+        prices.put(100, new PricePoint(1100, now, 1000, now)); // high 1100, low 1000
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        stock.put(100, 50);
+        AccountState account = new AccountState(0L, emptySlots(8), stock);
+
+        // No stale relists, but the held item is crashing: dump it now at the insta-sell (low) price
+        // rather than listing at the high and watching the value fall further.
+        FlipPlan plan = engine.plan(Collections.emptyList(), prices, account, new BuyLimitLedger(),
+                config(), now, Collections.emptyMap(), Set.of(100));
+
+        assertEquals(Collections.singletonList(FlipAction.placeSell(0, 100, 1000, 50)),
+                plan.actions());
     }
 
     @Test
