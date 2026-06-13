@@ -335,6 +335,20 @@ class FlipTaskTest {
     }
 
     @Test
+    void clearAppliesAndPersistsEvenWhenTheMarketFetchFails() {
+        history.recordSale(100, 5, -1_500L, true, Instant.now());
+        clearHistory.set(true);
+
+        task(url -> {
+            throw new IOException("wiki down");
+        }).execute();
+
+        assertTrue(history.records().isEmpty(), "an outage cannot delay the clear");
+        assertEquals(1, persisted.size(), "the clear is persisted immediately");
+        assertTrue(persisted.get(0).tradeHistory().isEmpty());
+    }
+
+    @Test
     void membersStockIsNeverOfferedWhenMembersItemsAreOff() {
         config.set(FlipConfig.builder()
                 .capitalCap(0L).perItemCapitalCap(1_000_000L)

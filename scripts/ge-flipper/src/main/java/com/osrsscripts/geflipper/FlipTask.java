@@ -100,6 +100,13 @@ public final class FlipTask implements Task {
 
     @Override
     public void execute() {
+        if (clearHistoryRequest.getAndSet(false)) {
+            // Raised by the sidebar's Clear button (EDT); applied here on the script thread,
+            // ahead of the market fetch so an outage cannot delay it, and persisted at once so
+            // a crash cannot resurrect the cleared records.
+            history.clear();
+            persister.accept(StateMapper.snapshot(ledger, stock, tracker, history, config.get()));
+        }
         Map<Integer, ItemMeta> mapping;
         Map<Integer, PricePoint> latest;
         Map<Integer, VolumePoint> volumes;
@@ -114,10 +121,6 @@ public final class FlipTask implements Task {
 
         Instant now = Instant.now();
         FlipConfig currentConfig = config.get();
-        if (clearHistoryRequest.getAndSet(false)) {
-            // Raised by the sidebar's Clear button (EDT); applied here on the script thread.
-            history.clear();
-        }
         List<GeOffer> offers = tracker.observe(client.offers(), now);
         for (GeOffer offer : offers) {
             // A completed sell ends the item's losing streak; relist pressure resets.
