@@ -38,9 +38,9 @@ public final class FlipperPanel extends JPanel {
         CAPITAL_CAP("Capital cap (gp)"),
         PER_ITEM_CAPITAL_CAP("Max spend per item (gp)"),
         MIN_MARGIN_GP("Min margin (gp)"),
-        MIN_MARGIN_PCT("Min margin (fraction)"),
-        MIN_VOLUME("Min volume (units/h)"),
-        MIN_DEPLOYMENT_GP("Min buy deployment (gp)"),
+        MIN_MARGIN_PCT("Min ROI (%)"),
+        MIN_VOLUME("Min hourly volume (units)"),
+        MIN_DEPLOYMENT_GP("Min spend per buy (gp)"),
         MAX_SLOTS("Max GE slots (1-8)"),
         MAX_OFFER_AGE_MINUTES("Max offer age (minutes)"),
         SELL_EXIT_AFTER_RELISTS("Insta-sell after relists (0=off)"),
@@ -150,7 +150,8 @@ public final class FlipperPanel extends JPanel {
             case MIN_MARGIN_GP:
                 return Long.toString(config.minMarginGp());
             case MIN_MARGIN_PCT:
-                return Double.toString(config.minMarginPct());
+                // Stored as a fraction (0.02), shown and entered as a percent (2).
+                return trimNumber(config.minMarginPct() * 100.0);
             case MIN_VOLUME:
                 return Long.toString(config.minVolume());
             case MIN_DEPLOYMENT_GP:
@@ -192,7 +193,7 @@ public final class FlipperPanel extends JPanel {
                 .capitalCap(parseLong(Field.CAPITAL_CAP, 0))
                 .perItemCapitalCap(parseLong(Field.PER_ITEM_CAPITAL_CAP, 0))
                 .minMarginGp(parseLong(Field.MIN_MARGIN_GP, 0))
-                .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT))
+                .minMarginPct(parseDouble(Field.MIN_MARGIN_PCT) / 100.0)
                 .minVolume(parseLong(Field.MIN_VOLUME, 0))
                 .minDeploymentGp(parseLong(Field.MIN_DEPLOYMENT_GP, 0))
                 .maxSlots(maxSlots)
@@ -281,6 +282,18 @@ public final class FlipperPanel extends JPanel {
             default:
                 return "";
         }
+    }
+
+    /** Formats a double for a text field: US decimal point, no float noise or trailing zeros. */
+    private static String trimNumber(double value) {
+        String s = String.format(Locale.US, "%.4f", value);
+        if (s.contains(".")) {
+            s = s.replaceAll("0+$", "");
+            if (s.endsWith(".")) {
+                s = s.substring(0, s.length() - 1);
+            }
+        }
+        return s;
     }
 
     private static String formatRuntime(Duration runtime) {

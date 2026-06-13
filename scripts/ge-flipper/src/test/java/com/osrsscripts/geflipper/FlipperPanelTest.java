@@ -78,6 +78,21 @@ class FlipperPanelTest {
     }
 
     @Test
+    void minRoiIsShownAndEnteredAsAPercent() {
+        List<FlipConfig> applied = new ArrayList<>();
+        FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
+
+        // The 0.01 fraction displays as "1" and round-trips on a no-op apply.
+        panel.clickApply();
+        assertEquals(0.01, applied.get(0).minMarginPct(), 1e-9);
+
+        // Typing 2 means 2%, stored as the 0.02 fraction.
+        panel.setField(FlipperPanel.Field.MIN_MARGIN_PCT, "2");
+        panel.clickApply();
+        assertEquals(0.02, applied.get(1).minMarginPct(), 1e-9);
+    }
+
+    @Test
     void membersCheckboxFlowsIntoTheConfig() {
         List<FlipConfig> applied = new ArrayList<>();
         FlipperPanel panel = new FlipperPanel(initial(), applied::add, () -> { });
