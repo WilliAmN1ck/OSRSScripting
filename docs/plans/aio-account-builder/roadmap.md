@@ -13,16 +13,16 @@ update the relevant line. This exists so the north star is never lost to increme
 ---
 
 ## 1. Engine & framework  ← current phase
-- [~] Task engine: ordered task list, `isComplete`/`validate`/`tree()` contract, scheduler
-- [~] Prioritized-task pattern (tut-island ≈ core.task.Task); behavior trees optional per-task
-- [~] Manual ordered task list + **task shuffling**
-- [~] State persistence / resume across restart
+- [x] Task engine: `TaskSpec` (isComplete/validate) + `BuilderScheduler` (skip-complete, validate-gate, seeded shuffle) — tested + live
+- [x] Prioritized-task pattern (tut-island ≈ core.task.Task); behavior trees optional per-task
+- [x] Manual ordered task list + **task shuffling** (seeded, deterministic)
+- [~] State persistence / resume — foundation built (BuildProfile/Codec/Store, tested); script wiring deferred
 - [ ] Auto-planner on top of the manual list (declarative target → ordering) — *deferred, design must not preclude*
 - [ ] Extract reusable engine/helpers to `libraries/sdk-support` (Path A fast-follow)
 
 ## 2. Skills (1–99, all methods)
 F2P-reachable first. One line per skill; expand into per-method sub-tasks as built.
-- [~] **Woodcutting** ← first slice (F2P chop→bank→target level)
+- [x] **Woodcutting** — F2P chop→bank→target level. **LIVE-VERIFIED 2026-06-13** (chop, Lumbridge multi-floor bank+return, stop-at-target, hands-off "unlocks at N" progression, 10+ min stable).
 - [ ] Attack · [ ] Strength · [ ] Defence · [ ] Hitpoints · [ ] Ranged · [ ] Magic · [ ] Prayer
 - [ ] Mining · [ ] Fishing · [ ] Cooking · [ ] Firemaking · [ ] Smithing · [ ] Crafting
 - [ ] Runecraft · [ ] Agility · [ ] Herblore · [ ] Thieving · [ ] Fletching · [ ] Slayer
@@ -60,7 +60,8 @@ F2P-reachable first. One line per skill; expand into per-method sub-tasks as bui
 - [ ] Easy Varrock Diary
 
 ## 8. Antiban & humanization
-- [x] Behavioral antiban: fidgets, fatigue scaling, look-away AFK (reused from ge-flipper)
+- [x] Behavioural antiban in the builder: fatigue-scaled cadence + look-away AFK (pure core.humanize).
+- [ ] SDK fidgets (camera/tab/mouse) in the builder — pending the sdk-support extraction of SdkFidget.
 - [x] Break-aware idling via SDK BreakHandler sidecar (reused)
 - [ ] MiniBreak system (short in-task micro-breaks)
 - [ ] "Huge antiban / anti-pattern" coverage review across all task types

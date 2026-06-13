@@ -34,6 +34,9 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // gson is provided by the dev plugin (compileOnly) at compile time and by Echo at runtime, but
+    // tests run on a plain JVM, so they need their own copy on the test classpath.
+    testImplementation("com.google.code.gson:gson:2.11.0")
 }
 
 tasks.test {

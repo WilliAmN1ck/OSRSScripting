@@ -11,9 +11,10 @@ import javax.swing.JTextField
 import javax.swing.SwingUtilities
 
 /**
- * Sidebar tab: a checkbox per Woodcutting [TreeType]. Trees the account lacks the level for are
- * disabled, and re-enable automatically as Woodcutting levels up during a run. The chop task reads
- * [selectedTrees] each tick.
+ * Sidebar tab: a checkbox per Woodcutting [TreeType]. Every tree is selectable — trees above the
+ * account's current level are labelled "(unlocks at N)" and start being cut automatically once the
+ * level is reached (the chop task only acts on [selectedTrees], which level-gates). This lets a build
+ * be set up once and progress hands-off (e.g. pre-check Normal + Oak + Willow + Yew).
  */
 internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBagLayout()) {
 
@@ -44,12 +45,12 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
 
         for (type in TreeType.values()) {
             val box = JCheckBox(label(type), type == TreeType.NORMAL)
-            box.toolTipText = "Requires Woodcutting ${type.levelReq}"
+            box.toolTipText = "Cut once Woodcutting reaches ${type.levelReq}"
             checkBoxes[type] = box
             c.gridy = row++
             add(box, c)
         }
-        refreshEnabled()
+        refreshLabels()
     }
 
     /** Checked trees the account currently has the level for. Safe to call off the EDT. */
@@ -69,13 +70,14 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
         woodcuttingLevel = level
         SwingUtilities.invokeLater {
             levelLabel.text = levelText()
-            refreshEnabled()
+            refreshLabels()
         }
     }
 
-    private fun refreshEnabled() {
+    /** Re-labels each tree to reflect whether it's currently cuttable or still locked. */
+    private fun refreshLabels() {
         for ((type, box) in checkBoxes) {
-            box.isEnabled = woodcuttingLevel >= type.levelReq
+            box.text = label(type)
         }
     }
 
@@ -83,6 +85,15 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
 
     private fun label(type: TreeType): String {
         val members = if (type.members) ", members" else ""
-        return "${type.displayName} (lvl ${type.levelReq}$members)"
+        return if (woodcuttingLevel >= type.levelReq) {
+            "${type.displayName} (lvl ${type.levelReq}$members)"
+        } else {
+            "${type.displayName} (unlocks at ${type.levelReq}$members)"
+        }
+    }
+
+    /** Test hook: set a tree's checkbox state without a display. */
+    internal fun setChecked(type: TreeType, checked: Boolean) {
+        checkBoxes[type]?.isSelected = checked
     }
 }

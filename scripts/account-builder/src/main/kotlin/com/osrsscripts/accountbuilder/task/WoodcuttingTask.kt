@@ -18,9 +18,10 @@ import org.tribot.script.sdk.util.TribotRandom
 
 /**
  * Woodcutting as a [BuilderTask]: complete once Woodcutting reaches the target level; otherwise chop
- * the nearest reachable user-selected, level-gated tree, bank all-but-axe at the nearest bank when
- * full, and return to the remembered chop spot. Each step keys off observable game state, so it is
- * re-entrant and safe to interrupt. (Execute is SDK-coupled and verified live.)
+ * the best (highest-level) reachable user-selected, level-gated tree — so it upgrades automatically as
+ * the account levels — bank all-but-axe at the nearest bank when full, and return to the remembered
+ * chop spot. Each step keys off observable game state, so it is re-entrant and safe to interrupt.
+ * (Execute is SDK-coupled and verified live.)
  */
 internal class WoodcuttingTask(
     private val allowedTrees: () -> Set<TreeType>,
@@ -37,6 +38,11 @@ internal class WoodcuttingTask(
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(Skill.WOODCUTTING) >= targetLevel()
 
+    // Not runnable with no tree selected — surfaces via the scheduler's "nothing runnable" path
+    // (a single periodic status line) rather than a per-tick warning from inside the task.
+    override fun validate(view: GameView): Boolean =
+        requirements.meets(view) && allowedTrees().isNotEmpty()
+
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("Woodcutting ${view.skills.level(Skill.WOODCUTTING)}/${targetLevel()}")
 
@@ -52,17 +58,20 @@ internal class WoodcuttingTask(
         if (MyPlayer.isAnimating()) return // already chopping
 
         val allowed = allowedTrees()
-        if (allowed.isEmpty()) {
-            Log.warn("No tree types selected within your Woodcutting level — pick one in the sidebar.")
-            return
-        }
+        if (allowed.isEmpty()) return // validate() gates this; guards the rare unselect-mid-tick race
 
-        val tree = Query.gameObjects()
-            .actionEquals("Chop down")
-            .filter { obj -> allowed.any { it.matches(obj.name) } }
-            .isReachable
-            .findClosest()
-            .orElse(null)
+        // Prefer the best (highest-level) qualified tree that's reachable, falling back to lower ones,
+        // so the bot upgrades automatically as Woodcutting levels up.
+        val tree = allowed
+            .sortedByDescending { it.levelReq }
+            .firstNotNullOfOrNull { type ->
+                Query.gameObjects()
+                    .actionEquals("Chop down")
+                    .filter { obj -> type.matches(obj.name) }
+                    .isReachable
+                    .findClosest()
+                    .orElse(null)
+            }
 
         if (tree == null) {
             val spot = chopSpot
@@ -91,7 +100,7 @@ internal class WoodcuttingTask(
         }
         // Deposit every non-axe item type explicitly, each with a short, human-like gap.
         val depositIds = Query.inventory()
-            .filter { item -> KEEP.none { keep -> keep.equals(item.name, ignoreCase = true) } }
+            .filter { item -> !Axes.isAxe(item.name) }
             .toList()
             .map { it.id }
             .distinct()
@@ -104,12 +113,6 @@ internal class WoodcuttingTask(
     }
 
     private companion object {
-        // Keep any axe; deposit everything else (logs, junk, stray tools/ammo).
-        val KEEP = arrayOf(
-            "Bronze axe", "Iron axe", "Steel axe", "Black axe",
-            "Mithril axe", "Adamant axe", "Rune axe", "Dragon axe",
-        )
-
         const val CHOP_TIMEOUT_MS = 8_000
         const val DEPOSIT_GAP_MIN_MS = 20
         const val DEPOSIT_GAP_MAX_MS = 80

@@ -199,7 +199,7 @@
 - [x] BuilderScheduler (first !complete && validate; skip-complete; seeded deterministic shuffle).
 - [x] Watchdog (thin stall seam: CONTINUE/STOP on a no-progress window).
 - [x] 19 tests green (Requirements 6, Scheduler 7, Watchdog 3, + TreeType 3).
-- [ ] Deferred to persistence (Phase 4): BuildProfile + gson ProfileCodec + schema version.
+- [x] Profile foundation (BuildProfile + gson ProfileCodec + schema version) — built in Phase 4 below.
 
 ## AIO Account Builder — Phase 3 (Woodcutting on the engine) — branch `account-builder-phase3` (stacked on Phase 2)
 - docs: aio-account-builder/phase-3-woodcutting-task/spec.md (+ phase-2-engine/handoff.md). Per-phase folders now.
@@ -208,6 +208,27 @@
 - [x] MainBacklogTask drives BuilderScheduler; AccountBuilderScript wires it; ChopAndBankTask removed.
 - [x] Panel: "Target Woodcutting level" field. compile + 19 tests + fatJar + deploy green.
 - [ ] Pre-merge: /code-review max, then merge.
-- [ ] Live verify (Echo): chop→bank→repeat via the scheduler; stops at the target level.
+- [x] Live verify (Echo) — DONE 2026-06-13 on test acct (Y8Tgy4wij): chop, Lumbridge multi-floor bank+return,
+      stop-at-target (log "all tasks complete — stopping" at WC 11), hands-off "unlocks at N" UI, 10+ min stable,
+      no watchdog false-stop. Handoffs: phase-3-woodcutting-task/handoff.md, phase-4-persistence-and-hardening/handoff.md.
+
+## AIO Account Builder — Phase 4 (persistence foundation) — branch `account-builder-phase4` (stacked on Phase 3)
+- Pure part only (no client needed). engine/profile.
+- [x] BuildProfile + TaskConfig + SCHEMA_VERSION.
+- [x] ProfileCodec (gson; normalizes missing/older fields) + ProfileStore (file I/O; missing/corrupt → default).
+- [x] gson added as testImplementation (plugin provides compileOnly; Echo provides at runtime).
+- [x] 26 tests green (added ProfileCodec 3, ProfileStore 4).
+- [x] Review-driven (do-it-all): build-complete stop; Watchdog wired (no WC XP for 5 min → stop);
+      SdkGameView explicit Skill→SDK map; MainBacklogTask non-BuilderTask guard; antiban parity via
+      pure core.humanize (fatigue cadence + look-away AFK). 30 tests green.
+- [x] Edge-case review: FIXED critical watchdog false-stop after breaks (reset on break/logout) +
+      widened stall window to 10 min; "nothing runnable" now a single periodic status line (#4). 31 tests.
+- [x] 2nd thorough review → hands-off progression: pre-select any tree (locked ones labelled
+      "unlocks at N"); chop the BEST qualified reachable tree; auto-upgrades as WC levels. Panel test. 35 tests.
+      NOTE: cross-location upgrade (walking to higher-tree spots as you level) is a future feature.
+- [ ] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check; bank PIN handling;
+      random-event / non-break-logout (login handler) behaviour.
+- [ ] Deferred (need client / extraction): SDK fidgets (need sdk-support SdkFidget extraction);
+      persistence resume wiring + paint/stats (need live verify); MiniBreaks.
 
 ## Phase 4 — Publish / distribution  (later / optional)
