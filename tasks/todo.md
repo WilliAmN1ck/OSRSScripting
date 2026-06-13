@@ -168,4 +168,14 @@
       regression on relist escalation. Suite + fatJar green. Reviewed (0 findings).
 - [ ] Live soak: a held item in a real crash is dumped at the low.
 
+## AIO Account Builder — Phase 0 (Spike & scaffold) — branch `account-builder-scaffold` (2026-06-13)
+- spec/plan/roadmap in docs/plans/aio-account-builder/. Engine-first Kotlin AIO; Woodcutting slice.
+- [x] 0.1 SDK API spike → sdk-notes.md (Javadoc host down; used TribotRS example repo). KEY FINDING:
+      tut-island (closest AIO analog) uses prioritized tasks, NOT behavior trees → pivoted engine
+      backbone to prioritized tasks (≈ core.task.Task). Confirmed Bank/Query/MyPlayer/Waiting/Equipment/
+      GameState statics + dentistWalker walking. Pivot reflected in spec/plan/roadmap/memory.
+- [x] 0.2 Module scaffold (scripts/account-builder/build.gradle.kts, settings include) — builds green
+- [x] 0.3 Heartbeat AccountBuilderScript : TribotScript on a TaskRunner loop — compiles + fatJar green
+- [x] 0.4 fatJar + deployLocally produce account-builder.jar ("loads in Echo" = user verify)
+
 ## Phase 4 — Publish / distribution  (later / optional)
