@@ -20,6 +20,12 @@ class BuilderScheduler(tasks: List<TaskSpec>, shuffleSeed: Long? = null) {
     fun next(view: GameView): TaskSpec? =
         backlog.firstOrNull { !it.isComplete(view) && it.validate(view) }
 
-    /** Whether every task in the backlog is complete. */
-    fun allComplete(view: GameView): Boolean = backlog.all { it.isComplete(view) }
+    /**
+     * Whether no pending runnable goal remains — every task is either complete or not currently runnable
+     * (nothing selected, or requirements that nothing will satisfy). A task that is incomplete AND
+     * validates is still pending, so this stays false while real work remains. This lets a run stop
+     * cleanly once the configured skills reach their targets, even if another (unconfigured, opt-in)
+     * skill never "completes".
+     */
+    fun allDone(view: GameView): Boolean = backlog.all { it.isComplete(view) || !it.validate(view) }
 }

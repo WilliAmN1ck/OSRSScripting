@@ -16,6 +16,8 @@ update the relevant line. This exists so the north star is never lost to increme
 - [x] Task engine: `TaskSpec` (isComplete/validate) + `BuilderScheduler` (skip-complete, validate-gate, seeded shuffle) — tested + live
 - [x] Prioritized-task pattern (tut-island ≈ core.task.Task); behavior trees optional per-task
 - [x] Manual ordered task list + **task shuffling** (seeded, deterministic)
+- [x] **Shared `GatheringTask`** (PR #31): generic gather/bank/return + tool-from-bank + spot-persistence, parameterized by skill / action / resource / tool; pure `GatherResource` (name- or id-matched) + `ToolModel` seams. Powers Woodcutting + Mining.
+- [x] Per-skill **"Train this skill"** toggle (PR #32): each skill tab enables/disables itself in the scheduler (`allDone` ignores disabled skills).
 - [x] State persistence — config (trees + target) saved/restored via ProfileStore in the script-settings dir; wired + tested; **resume LIVE-VERIFIED 2026-06-13** (restart restores selection + target)
 - [ ] Auto-planner on top of the manual list (declarative target → ordering) — *deferred, design must not preclude*
 - [ ] Extract reusable engine/helpers to `libraries/sdk-support` (Path A fast-follow)
@@ -28,8 +30,11 @@ F2P-reachable first. One line per skill; expand into per-method sub-tasks as bui
   - [x] Persistent chop-location: the last chop tile is saved to the profile (throttled by distance), so a
     restart — or a cold start at a bank — walks back to the trees and resumes. **LIVE-VERIFIED 2026-06-13**.
     (A brand-new account that has never chopped still can't locate trees from a cold bank start.)
+- [~] **Mining** — F2P ore ladder (Copper→Adamantite) on the shared gatherer; rocks matched **by name**
+  ("Copper rocks", …) like trees, no id table; pickaxe auto-fetch; per-skill toggle. Code complete, 82
+  tests (PR #32); **live-verify pending** (Al-Kharid → mine → bank → return).
 - [ ] Attack · [ ] Strength · [ ] Defence · [ ] Hitpoints · [ ] Ranged · [ ] Magic · [ ] Prayer
-- [ ] Mining · [ ] Fishing · [ ] Cooking · [ ] Firemaking · [ ] Smithing · [ ] Crafting
+- [ ] Fishing · [ ] Cooking · [ ] Firemaking · [ ] Smithing · [ ] Crafting
 - [ ] Runecraft · [ ] Agility · [ ] Herblore · [ ] Thieving · [ ] Fletching · [ ] Slayer
 - [ ] Hunter · [ ] Construction · [ ] Farming (skill training, distinct from run-task below)
 

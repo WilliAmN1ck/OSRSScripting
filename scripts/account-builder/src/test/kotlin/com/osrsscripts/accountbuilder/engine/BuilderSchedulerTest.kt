@@ -44,11 +44,15 @@ class BuilderSchedulerTest {
     }
 
     @Test
-    fun allCompleteReflectsTheBacklog() {
-        assertFalse(
-            BuilderScheduler(listOf(task("a", complete = true), task("b"))).allComplete(view),
-        )
-        assertTrue(BuilderScheduler(listOf(task("a", complete = true))).allComplete(view))
+    fun allDoneWhenEveryTaskIsCompleteOrNotRunnable() {
+        // A pending runnable goal (incomplete + valid) keeps it false.
+        assertFalse(BuilderScheduler(listOf(task("a", complete = true), task("b"))).allDone(view))
+        // All complete → done.
+        assertTrue(BuilderScheduler(listOf(task("a", complete = true))).allDone(view))
+        // An incomplete-but-unrunnable task (e.g. nothing selected / opt-in skill) does NOT block done.
+        assertTrue(BuilderScheduler(listOf(task("a", complete = true), task("b", valid = false))).allDone(view))
+        // But an incomplete + runnable task is still pending.
+        assertFalse(BuilderScheduler(listOf(task("a", valid = false), task("b"))).allDone(view))
     }
 
     @Test

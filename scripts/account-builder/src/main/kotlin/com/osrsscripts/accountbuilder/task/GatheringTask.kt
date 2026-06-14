@@ -32,6 +32,7 @@ internal class GatheringTask(
     private val skill: Skill,
     private val gatherAction: String,
     private val tool: ToolModel,
+    private val enabled: () -> Boolean,
     private val allowedResources: () -> Set<GatherResource>,
     private val targetLevel: () -> Int,
     initialSpot: WorldTile? = null,
@@ -47,6 +48,9 @@ internal class GatheringTask(
     // Throttles the "no usable tool anywhere" warning so a misconfigured run logs once per interval.
     private var lastNoToolLogMs = 0L
 
+    // Throttles the "resources here aren't recognised" diagnostic (surfaces missing/mismatched ids).
+    private var lastUnknownLogMs = 0L
+
     private val skillLabel = skill.name.lowercase().replaceFirstChar { it.uppercase() }
 
     /** The current gather anchor (for persistence), or null if we've never gathered and none was restored. */
@@ -55,11 +59,11 @@ internal class GatheringTask(
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(skill) >= targetLevel()
 
-    // Not runnable with nothing selected. Tool availability is deliberately NOT gated here: when the
-    // player has no tool, execute() actively fetches the best usable one from the bank, so the task must
-    // be allowed to run to do that. ("Nothing selected" surfaces via the scheduler's status line.)
+    // Not runnable unless the skill is enabled (its tab's "Train this skill" toggle) and has something
+    // selected. Tool availability is deliberately NOT gated here: when the player has no tool, execute()
+    // actively fetches the best usable one from the bank, so the task must be allowed to run to do that.
     override fun validate(view: GameView): Boolean =
-        requirements.meets(view) && allowedResources().isNotEmpty()
+        enabled() && requirements.meets(view) && allowedResources().isNotEmpty()
 
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("$skillLabel ${view.skills.level(skill)}/${targetLevel()}")
@@ -83,6 +87,7 @@ internal class GatheringTask(
 
         val target = findReachableResource()
         if (target == null) {
+            logUnrecognisedResources() // surface what's actually here if nothing selected matches
             val anchor = spot
             if (anchor == null) {
                 Log.warn("No $skillLabel resource reachable and no spot remembered — start at the resource.")
@@ -177,6 +182,23 @@ internal class GatheringTask(
         }
     }
 
+    /**
+     * When no selected resource is reachable, periodically log the reachable gather-action objects'
+     * `name#id` here. Surfaces a missing or mismatched entry in the resource table (rock ids vary by
+     * mine), and tells the user the spot's resources aren't recognised.
+     */
+    private fun logUnrecognisedResources() {
+        val now = System.currentTimeMillis()
+        if (now - lastUnknownLogMs < UNKNOWN_LOG_INTERVAL_MS) return
+        // Log every loaded gather-action object in view (NOT just reachable ones) so the id table can be
+        // captured by just having the mine on-screen — no precise positioning needed.
+        val nearby = Query.gameObjects().actionEquals(gatherAction).toList()
+        if (nearby.isEmpty()) return
+        lastUnknownLogMs = now
+        val sample = nearby.map { "${it.name}#${it.id}" }.distinct().take(SAMPLE_SIZE).joinToString()
+        Log.info("$skillLabel: nearby '$gatherAction' objects (name#id) — $sample")
+    }
+
     private companion object {
         const val GATHER_TIMEOUT_MS = 8_000
         const val DEPOSIT_GAP_MIN_MS = 20
@@ -184,5 +206,7 @@ internal class GatheringTask(
         const val CLOSE_TIMEOUT_MS = 2_000
         const val WITHDRAW_TIMEOUT_MS = 3_000
         const val NO_TOOL_LOG_INTERVAL_MS = 30_000L
+        const val UNKNOWN_LOG_INTERVAL_MS = 15_000L
+        const val SAMPLE_SIZE = 20
     }
 }

@@ -6,9 +6,11 @@ import com.osrsscripts.accountbuilder.engine.profile.BuildProfile
 import com.osrsscripts.accountbuilder.engine.profile.ProfileStore
 import com.osrsscripts.accountbuilder.engine.profile.TileCodec
 import com.osrsscripts.accountbuilder.engine.profile.getTaskParam
-import com.osrsscripts.accountbuilder.engine.profile.withTaskParam
 import com.osrsscripts.accountbuilder.runner.MainBacklogTask
+import com.osrsscripts.accountbuilder.task.GatheringTask
+import com.osrsscripts.accountbuilder.task.MINING_KEY
 import com.osrsscripts.accountbuilder.task.WOODCUTTING_KEY
+import com.osrsscripts.accountbuilder.task.miningTask
 import com.osrsscripts.accountbuilder.task.woodcuttingTask
 import com.osrsscripts.accountbuilder.view.SdkGameView
 import com.osrsscripts.core.humanize.AfkScheduler
@@ -30,11 +32,12 @@ import kotlin.math.abs
 /**
  * Entry point for the AIO Account Builder.
  *
- * Drives a sidebar-configured Woodcutting task through the pure engine ([BuilderScheduler] →
- * [GatheringTask]) on the shared [TaskRunner], with antiban: Echo's action AI, break shadowing,
- * a fatigue-scaled loop cadence, and occasional look-away AFKs. Stops when every task is complete,
- * and a [Watchdog] stops the run if no Woodcutting XP is gained for a while (stuck). The task
- * engine, capability seams, and full task catalogue grow in later phases.
+ * Drives one sidebar-configured [GatheringTask] per skill (Woodcutting + Mining) through the pure engine
+ * ([BuilderScheduler]) on the shared [TaskRunner], with antiban: Echo's action AI, break shadowing, a
+ * fatigue-scaled loop cadence, and occasional look-away AFKs. Stops when every task is complete, and a
+ * [Watchdog] stops the run if no XP is gained across the configured skills for a while (stuck). Each
+ * skill's config (selection + target) and gather anchor persist to one profile. The task catalogue grows
+ * in later phases.
  */
 class AccountBuilderScript : TribotScript {
 
@@ -44,17 +47,42 @@ class AccountBuilderScript : TribotScript {
 
         val store = ProfileStore(ScriptSettings.getDefault().directory.toPath().resolve(PROFILE_FILE))
         val savedProfile = store.load()
-        val panel = AccountBuilderPanel(woodcuttingLevel())
-        panel.applyProfile(savedProfile) // restore the saved tree selection + target level
-        context.sidebar.addSidebarTab(TAB_NAME, null, panel)
 
-        // Restore the last chop anchor so a restart (or a cold start at a bank) walks back to the trees.
-        val savedChopSpot = savedProfile.getTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM)
-            ?.let(TileCodec::parse)
-            ?.let { (x, y, plane) -> WorldTile(x, y, plane) }
-        val woodcutting = woodcuttingTask({ panel.selectedTrees() }, panel::targetLevel, savedChopSpot)
-        val scheduler = BuilderScheduler(listOf(woodcutting))
+        // One config tab per skill, each with a "Train this skill" toggle that gates the scheduler.
+        // Woodcutting defaults on (preserving the prior single-skill behaviour) with Normal pre-selected;
+        // Mining defaults off (opt-in), so a Woodcutting-only user is unaffected until they enable it.
+        val wcPanel = GatherConfigPanel(
+            title = "Trees to cut",
+            skillLabel = "Woodcutting",
+            resources = TreeType.values().toList(),
+            taskKey = WOODCUTTING_KEY,
+            resourceParamKey = WC_RESOURCE_PARAM,
+            initialLevel = woodcuttingLevel(),
+            defaultSelected = setOf(TreeType.NORMAL.id),
+            defaultEnabled = true,
+        )
+        val minePanel = GatherConfigPanel(
+            title = "Rocks to mine",
+            skillLabel = "Mining",
+            resources = RockType.values().toList(),
+            taskKey = MINING_KEY,
+            resourceParamKey = MINE_RESOURCE_PARAM,
+            initialLevel = miningLevel(),
+            defaultEnabled = false,
+        )
+        wcPanel.applyProfile(savedProfile)
+        minePanel.applyProfile(savedProfile)
+        context.sidebar.addSidebarTab(WC_TAB, null, wcPanel)
+        context.sidebar.addSidebarTab(MINE_TAB, null, minePanel)
+
+        val woodcutting = woodcuttingTask(wcPanel::isTrainingEnabled, { wcPanel.selectedResources() }, wcPanel::targetLevel, savedSpot(savedProfile, WOODCUTTING_KEY))
+        val mining = miningTask(minePanel::isTrainingEnabled, { minePanel.selectedResources() }, minePanel::targetLevel, savedSpot(savedProfile, MINING_KEY))
+        val scheduler = BuilderScheduler(listOf(woodcutting, mining))
         val runner = TaskRunner(listOf(MainBacklogTask(scheduler) { SdkGameView }))
+        val skills = listOf(
+            SkillState(wcPanel, woodcutting, WOODCUTTING_KEY),
+            SkillState(minePanel, mining, MINING_KEY),
+        )
 
         val random = Random()
         val startedAt = Instant.now()
@@ -62,8 +90,8 @@ class AccountBuilderScript : TribotScript {
         val cadence = DelayDistribution(CADENCE_MIN_MS, CADENCE_MAX_MS, random)
         val afk = AfkScheduler(startedAt, random, AFK_MIN_GAP, AFK_MAX_GAP, AFK_MIN, AFK_MAX)
         val watchdog = Watchdog(STALL_LIMIT_MS)
-        // Seed with the loaded chop anchor so we don't redundantly re-save it on the first tick.
-        var lastSavedProfile = composeProfile(panel, savedProfile, savedChopSpot?.let { TileCodec.format(it.x, it.y, it.plane) })
+        // Seed with the loaded config + anchors so the first tick doesn't redundantly re-save.
+        var lastSavedProfile = composeProfile(savedProfile, skills) { savedProfile.getTaskParam(it.key, CHOP_TILE_PARAM) }
 
         try {
             while (!Thread.currentThread().isInterrupted) {
@@ -74,8 +102,8 @@ class AccountBuilderScript : TribotScript {
                     context.waiting.sleep(IDLE_POLL_MS)
                     continue
                 }
-                // Never act (or read skill levels) while logged out — the break/login handler
-                // brings us back in; until then, stay idle (and don't count it as a stall).
+                // Never act (or read skill levels) while logged out — the break/login handler brings us
+                // back in; until then, stay idle (and don't count it as a stall).
                 if (!Login.isLoggedIn()) {
                     watchdog.reset()
                     context.waiting.sleep(IDLE_POLL_MS)
@@ -84,14 +112,14 @@ class AccountBuilderScript : TribotScript {
 
                 val now = Instant.now()
 
-                // Every task done: announce and stop.
-                if (scheduler.allComplete(SdkGameView)) {
+                // No pending runnable goal left (configured skills done): announce and stop.
+                if (scheduler.allDone(SdkGameView)) {
                     context.logger.info("AIO Account Builder: all tasks complete — stopping.")
                     break
                 }
                 // No progress for too long: bail rather than spin forever (stuck/misconfigured).
-                if (watchdog.evaluate(now.toEpochMilli(), woodcuttingXp()) == Watchdog.Decision.STOP) {
-                    context.logger.warn("No Woodcutting XP gained for a while — stopping (stuck?).")
+                if (watchdog.evaluate(now.toEpochMilli(), trainedXp()) == Watchdog.Decision.STOP) {
+                    context.logger.warn("No skill XP gained for a while — stopping (stuck?).")
                     break
                 }
 
@@ -107,11 +135,12 @@ class AccountBuilderScript : TribotScript {
                     continue
                 }
 
-                // Re-gate the tree checkboxes as Woodcutting levels up during the run.
-                panel.setWoodcuttingLevel(woodcuttingLevel())
-                // Persist config (trees / target) immediately, and the chop anchor when it relocates, so
-                // a restart returns to the trees without spamming the disk with tree-to-tree jitter.
-                val profile = composeProfile(panel, savedProfile, stabilizedChopTile(woodcutting.currentSpot(), lastSavedProfile))
+                // Re-gate each skill's checkboxes as its level rises during the run.
+                wcPanel.setSkillLevel(woodcuttingLevel())
+                minePanel.setSkillLevel(miningLevel())
+                // Persist config (selection / target) immediately, and each gather anchor when it
+                // relocates, so a restart returns to the resource without spamming the disk.
+                val profile = composeProfile(savedProfile, skills) { stabilizedSpot(it.task.currentSpot(), it.key, lastSavedProfile) }
                 if (profile != lastSavedProfile) {
                     runCatching { store.save(profile) }
                         .onFailure { context.logger.warn("Failed to save profile", it) }
@@ -121,29 +150,47 @@ class AccountBuilderScript : TribotScript {
                 context.waiting.sleep(Math.round(cadence.nextMs() * fatigue.multiplierAt(now)))
             }
         } finally {
-            context.sidebar.removeSidebarTab(TAB_NAME)
+            context.sidebar.removeSidebarTab(WC_TAB)
+            context.sidebar.removeSidebarTab(MINE_TAB)
         }
     }
 
     private fun woodcuttingLevel(): Int = Skill.WOODCUTTING.getActualLevel()
 
-    // Watchdog progress signal. Woodcutting-specific for now (the only task); switch to total XP
-    // once the backlog spans multiple skills, or a non-WC task would look like a WC stall.
-    private fun woodcuttingXp(): Long = Skill.WOODCUTTING.getXp().toLong()
+    private fun miningLevel(): Int = Skill.MINING.getActualLevel()
 
-    // Builds the profile to persist: the panel's config (trees / target) plus the chop-tile anchor,
-    // preserving the loaded shuffleSeed so a save never silently drops a persisted field.
-    private fun composeProfile(panel: AccountBuilderPanel, loaded: BuildProfile, chopTileParam: String?): BuildProfile =
-        panel.toProfile()
-            .copy(shuffleSeed = loaded.shuffleSeed)
-            .withTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM, chopTileParam)
+    // Watchdog progress signal: total XP across the configured skills, so a non-Woodcutting task no
+    // longer looks like a Woodcutting stall.
+    private fun trainedXp(): Long = (Skill.WOODCUTTING.getXp() + Skill.MINING.getXp()).toLong()
 
-    // Keeps the last-saved chop anchor unless the player has genuinely relocated (different plane or more
-    // than CHOP_TILE_RESAVE_THRESHOLD tiles away), so config saves stay instant while the chop tile only
-    // re-persists on a real move rather than on every tree-to-tree step.
-    private fun stabilizedChopTile(current: WorldTile?, lastSaved: BuildProfile): String? {
-        val previous = lastSaved.getTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM)
-        if (current == null) return previous // nothing new to record; keep what we had
+    /** A configured skill: its config panel, its running task, and its persistence key. */
+    private class SkillState(val panel: GatherConfigPanel, val task: GatheringTask, val key: String)
+
+    private fun savedSpot(profile: BuildProfile, key: String): WorldTile? =
+        profile.getTaskParam(key, CHOP_TILE_PARAM)
+            ?.let(TileCodec::parse)
+            ?.let { (x, y, plane) -> WorldTile(x, y, plane) }
+
+    /**
+     * Builds the profile to persist: each skill's config (selection / target) plus its gather anchor,
+     * preserving the loaded shuffleSeed so a save never silently drops a persisted field. [spotOf]
+     * supplies each skill's anchor string (or null to omit it).
+     */
+    private fun composeProfile(loaded: BuildProfile, skills: List<SkillState>, spotOf: (SkillState) -> String?): BuildProfile {
+        val tasks = skills.map { s ->
+            val base = s.panel.toProfile().tasks.first()
+            val spot = spotOf(s)
+            if (spot == null) base else base.copy(params = base.params + (CHOP_TILE_PARAM to spot))
+        }
+        return BuildProfile(shuffleSeed = loaded.shuffleSeed, tasks = tasks)
+    }
+
+    // Keeps a skill's last-saved anchor unless the player has genuinely relocated (different plane or more
+    // than CHOP_TILE_RESAVE_THRESHOLD tiles away), so config saves stay instant while the anchor only
+    // re-persists on a real move rather than on every step between resources.
+    private fun stabilizedSpot(current: WorldTile?, key: String, lastSaved: BuildProfile): String? {
+        val previous = lastSaved.getTaskParam(key, CHOP_TILE_PARAM)
+        if (current == null) return previous
         val prev = TileCodec.parse(previous)
         val relocated = prev == null ||
             prev.third != current.plane ||
@@ -152,16 +199,19 @@ class AccountBuilderScript : TribotScript {
     }
 
     private companion object {
-        const val TAB_NAME = "Account Builder"
+        const val WC_TAB = "Woodcutting"
+        const val MINE_TAB = "Mining"
         const val PROFILE_FILE = "account-builder-profile.json"
-        const val CHOP_TILE_PARAM = "chopTile"
+        const val WC_RESOURCE_PARAM = "trees"
+        const val MINE_RESOURCE_PARAM = "rocks"
+        const val CHOP_TILE_PARAM = "chopTile" // per-skill gather anchor (kept named "chopTile" for back-compat)
         const val CHOP_TILE_RESAVE_THRESHOLD = 8 // tiles; re-persist the anchor only on a real relocation
         const val IDLE_POLL_MS = 2_000L
         const val CADENCE_MIN_MS = 400L
         const val CADENCE_MAX_MS = 900L
         const val FATIGUE_MAX = 1.6
-        // Generous: a look-away AFK plus a long bank round-trip legitimately gains no WC XP, so a
-        // tight window would false-stop a healthy run. Only a genuinely stuck run trips this. Tune at soak.
+        // Generous: a look-away AFK plus a long bank round-trip legitimately gains no XP, so a tight
+        // window would false-stop a healthy run. Only a genuinely stuck run trips this. Tune at soak.
         const val STALL_LIMIT_MS = 10L * 60 * 1000
         const val AFK_CHUNK_MS = 1_000L
         val FATIGUE_RAMP: Duration = Duration.ofHours(3)
