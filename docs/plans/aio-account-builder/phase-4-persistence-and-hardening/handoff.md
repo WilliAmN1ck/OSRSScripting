@@ -45,9 +45,7 @@ false-stop over 10+ minutes, **build-complete stop** fired cleanly at the target
 ## Known Issues / Queued for the next live run
 - **no-axe pre-check — DONE** (post-#25 follow-up, see below).
 - **withdraw axe from bank — DONE** (post-#25 follow-up, see below).
-- **persistent chop-location** — a cold start *at* a bank with no axe withdraws the axe but can't
-  auto-navigate to the trees (the bot has no tree-finding; it only learns a chop spot by chopping).
-  Saving the last chop tile to the profile would let it return after any restart. Future capability.
+- **persistent chop-location — DONE** (post-#25 follow-up, see below).
 - bank PIN handling; random-event / non-break-logout (login handler) behaviour.
 
 ## Follow-ups (post-#25)
@@ -66,8 +64,18 @@ false-stop over 10+ minutes, **build-complete stop** fired cleanly at the target
   tier ≤ WC level; Crystal/Infernal/3rd-age/Gilded deliberately skipped to avoid burning/risking a
   degradable or rare axe) → return. If started *at* the trees it remembers the spot and walks back; a cold
   start *at* a bank withdraws the axe but then logs "start at the trees" (no tree-finding — see persistent
-  chop-location above). Full-inventory-with-no-axe deposits to free a slot before withdrawing (no silent
+  chop-location below). Full-inventory-with-no-axe deposits to free a slot before withdrawing (no silent
   deadlock). Bank has no usable axe → throttled warn + watchdog backstop. **50 tests** green.
+- **Persistent chop-location:** the last chop tile is saved to the woodcutting `TaskConfig` params
+  (`chopTile = "x,y,plane"`, additive — no schema bump) and restored on start to seed
+  `WoodcuttingTask.chopSpot`, so a restart (or a cold start at a bank) walks back to the trees and resumes.
+  Pure `TileCodec` (string ↔ x,y,plane) + `BuildProfile.withTaskParam` (both unit-tested); `WorldTile`
+  bridging is SDK-coupled → live-verified. Saves are **throttled by distance** (`stabilizedChopTile`:
+  re-persist only on a >8-tile move or plane change) so config still saves instantly without disk spam.
+  Review-driven hardening folded in: the `"woodcutting"` task key is now a single shared `WOODCUTTING_KEY`
+  constant (was a 3-way literal), and the save now preserves the loaded `shuffleSeed` instead of dropping it.
+  **61 tests** green. Limitation: a brand-new account that has never chopped still can't locate trees from a
+  cold bank start (no tree-finding exists).
 
 ## Verification Commands
     .\gradlew.bat :scripts:account-builder:test

@@ -19,6 +19,9 @@ import org.tribot.script.sdk.types.WorldTile
 import org.tribot.script.sdk.util.TribotRandom
 import org.tribot.script.sdk.Skill as SdkSkill
 
+/** The Woodcutting task's [TaskKey] string — the single source of truth shared by the panel and script. */
+internal const val WOODCUTTING_KEY = "woodcutting"
+
 /**
  * Woodcutting as a [BuilderTask]: complete once Woodcutting reaches the target level; otherwise chop
  * the best (highest-level) reachable user-selected, level-gated tree — so it upgrades automatically as
@@ -29,17 +32,21 @@ import org.tribot.script.sdk.Skill as SdkSkill
 internal class WoodcuttingTask(
     private val allowedTrees: () -> Set<TreeType>,
     private val targetLevel: () -> Int,
+    initialChopSpot: WorldTile? = null,
 ) : BuilderTask {
 
-    override val key = TaskKey("woodcutting")
+    override val key = TaskKey(WOODCUTTING_KEY)
     override val requirements = Requirements() // normal F2P trees need nothing beyond the tree itself
 
-    // Captured the first time we chop, so we can walk back after banking — works wherever the user
-    // starts at the trees, no hardcoded tiles.
-    private var chopSpot: WorldTile? = null
+    // Captured the first time we chop, or restored from the saved profile, so we can walk back to the
+    // trees after banking or a restart — works wherever the user starts, no hardcoded tiles.
+    private var chopSpot: WorldTile? = initialChopSpot
 
     // Throttles the "no usable axe anywhere" warning so a misconfigured run logs once per interval.
     private var lastNoAxeLogMs = 0L
+
+    /** The current chop anchor (for persistence), or null if we've never chopped and none was restored. */
+    fun currentChopSpot(): WorldTile? = chopSpot
 
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(Skill.WOODCUTTING) >= targetLevel()

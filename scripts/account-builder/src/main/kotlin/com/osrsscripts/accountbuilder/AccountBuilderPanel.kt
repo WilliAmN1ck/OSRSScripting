@@ -2,6 +2,7 @@ package com.osrsscripts.accountbuilder
 
 import com.osrsscripts.accountbuilder.engine.profile.BuildProfile
 import com.osrsscripts.accountbuilder.engine.profile.TaskConfig
+import com.osrsscripts.accountbuilder.task.WOODCUTTING_KEY
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -125,7 +126,6 @@ internal class AccountBuilderPanel(initialWoodcuttingLevel: Int) : JPanel(GridBa
     }
 
     private companion object {
-        const val WOODCUTTING_KEY = "woodcutting" // must match WoodcuttingTask.key
         const val TREES_PARAM = "trees"
         const val TARGET_PARAM = "target"
     }

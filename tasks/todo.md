@@ -237,8 +237,13 @@
       withdraw best usable axe (Axes.bestUsableAxe; highest non-degradable tier ≤ WC level; crystal/infernal/
       3rd-age/gilded skipped). validate() axe gate dropped; execute() acquireAxe() step; deposits to free a
       slot if full. 50 tests; redeployed, pending live re-verify. Cold bank-start can't auto-find trees (Opt A).
+- [x] Persistent chop-location (branch `account-builder-persistent-chop-location`): last chop tile saved to
+      the woodcutting TaskConfig params (chopTile="x,y,plane"; TileCodec + BuildProfile.withTaskParam, both
+      unit-tested), restored on start to seed WoodcuttingTask.chopSpot → restart/cold-bank-start walks back
+      to the trees. Distance-throttled saves (>8 tiles). Review fixes: shared WOODCUTTING_KEY constant +
+      preserve shuffleSeed on save. 61 tests; redeployed, pending live re-verify.
 - [ ] Deferred: paint/stats overlay; SDK fidgets (need sdk-support SdkFidget extraction); MiniBreaks;
-      cross-location tree progression; PERSISTENT chop-location (return to trees after a cold bank start);
+      cross-location tree progression; never-chopped cold bank start (needs tree-area navigation);
       next-live-run edge cases (bank PIN, randoms/login).
 
 ## Phase 4 — Publish / distribution  (later / optional)
