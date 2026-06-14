@@ -1,10 +1,12 @@
 package com.osrsscripts.accountbuilder.view
 
+import com.osrsscripts.accountbuilder.engine.EquipmentView
 import com.osrsscripts.accountbuilder.engine.GameView
 import com.osrsscripts.accountbuilder.engine.InventoryView
 import com.osrsscripts.accountbuilder.engine.QuestView
 import com.osrsscripts.accountbuilder.engine.Skill
 import com.osrsscripts.accountbuilder.engine.SkillView
+import org.tribot.script.sdk.Equipment
 import org.tribot.script.sdk.Inventory
 import org.tribot.script.sdk.Worlds
 import org.tribot.script.sdk.query.Query
@@ -24,6 +26,11 @@ internal object SdkGameView : GameView {
         override fun isFull(): Boolean = Inventory.isFull()
         override fun contains(itemName: String): Boolean =
             Query.inventory().filter { it.name.equals(itemName, ignoreCase = true) }.isAny
+        override fun itemNames(): List<String> = Query.inventory().toList().map { it.name }
+    }
+
+    override val equipment = object : EquipmentView {
+        override fun itemNames(): List<String> = Equipment.getAll().map { it.name }
     }
 
     override val quests = object : QuestView {

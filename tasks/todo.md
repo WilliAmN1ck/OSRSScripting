@@ -226,12 +226,14 @@
 - [x] 2nd thorough review → hands-off progression: pre-select any tree (locked ones labelled
       "unlocks at N"); chop the BEST qualified reachable tree; auto-upgrades as WC levels. Panel test. 35 tests.
       NOTE: cross-location upgrade (walking to higher-tree spots as you level) is a future feature.
-- [ ] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check; bank PIN handling;
+- [~] Queued for the LIVE run (depend on Echo/account behaviour): no-axe pre-check **DONE** (branch
+      `account-builder-no-axe-guard` — validate() gates on an axe in inventory/equipped via Axes.hasAxe;
+      42 tests; redeployed, pending live re-verify); STILL QUEUED: bank PIN handling;
       random-event / non-break-logout (login handler) behaviour.
-- [x] Persistence WIRING (branch `account-builder-persistence-wiring`): panel toProfile()/applyProfile()
+- [x] Persistence WIRING (branch `account-builder-persistence-wiring`, #26 merged): panel toProfile()/applyProfile()
       ↔ BuildProfile; load on start + save-on-change via ProfileStore in the script-settings dir. 37 tests.
-      Resume pending a live-verify. (deployLocally blocked while the Echo client holds the jar — redeploy when closed.)
+      Resume **LIVE-VERIFIED 2026-06-13** (restart restores Oak/Willow/Yew + target 50).
 - [ ] Deferred: paint/stats overlay; SDK fidgets (need sdk-support SdkFidget extraction); MiniBreaks;
-      cross-location tree progression; the next-live-run edge cases (no-axe, bank PIN, randoms/login).
+      cross-location tree progression; withdraw-axe-from-bank; next-live-run edge cases (bank PIN, randoms/login).
 
 ## Phase 4 — Publish / distribution  (later / optional)

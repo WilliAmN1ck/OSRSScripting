@@ -4,6 +4,7 @@ package com.osrsscripts.accountbuilder.engine
 class FakeGameView(
     private val levels: Map<Skill, Int> = emptyMap(),
     private val items: Set<String> = emptySet(),
+    private val equipped: Set<String> = emptySet(),
     private val full: Boolean = false,
     private val completedQuests: Set<String> = emptySet(),
     private val membersWorld: Boolean = false,
@@ -14,7 +15,11 @@ class FakeGameView(
     }
     override val inventory = object : InventoryView {
         override fun contains(itemName: String): Boolean = itemName in items
+        override fun itemNames(): List<String> = items.toList()
         override fun isFull(): Boolean = full
+    }
+    override val equipment = object : EquipmentView {
+        override fun itemNames(): List<String> = equipped.toList()
     }
     override val quests = object : QuestView {
         override fun isComplete(quest: String): Boolean = quest in completedQuests
