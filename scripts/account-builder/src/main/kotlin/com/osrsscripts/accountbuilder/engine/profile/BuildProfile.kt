@@ -20,6 +20,10 @@ data class BuildProfile(
     }
 }
 
+/** The value of [paramKey] on the task with key [taskKey], or null if absent. Inverse of [withTaskParam]. */
+fun BuildProfile.getTaskParam(taskKey: String, paramKey: String): String? =
+    tasks.firstOrNull { it.key == taskKey }?.params?.get(paramKey)
+
 /**
  * Returns a copy with [paramKey] set to [value] on the task with key [taskKey] — or removed when
  * [value] is null. Adds the task config if it isn't present yet. Other tasks and params are untouched.

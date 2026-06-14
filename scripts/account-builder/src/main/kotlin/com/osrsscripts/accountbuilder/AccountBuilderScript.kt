@@ -5,6 +5,7 @@ import com.osrsscripts.accountbuilder.engine.Watchdog
 import com.osrsscripts.accountbuilder.engine.profile.BuildProfile
 import com.osrsscripts.accountbuilder.engine.profile.ProfileStore
 import com.osrsscripts.accountbuilder.engine.profile.TileCodec
+import com.osrsscripts.accountbuilder.engine.profile.getTaskParam
 import com.osrsscripts.accountbuilder.engine.profile.withTaskParam
 import com.osrsscripts.accountbuilder.runner.MainBacklogTask
 import com.osrsscripts.accountbuilder.task.WOODCUTTING_KEY
@@ -48,7 +49,7 @@ class AccountBuilderScript : TribotScript {
         context.sidebar.addSidebarTab(TAB_NAME, null, panel)
 
         // Restore the last chop anchor so a restart (or a cold start at a bank) walks back to the trees.
-        val savedChopSpot = savedProfile.chopTileParam()
+        val savedChopSpot = savedProfile.getTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM)
             ?.let(TileCodec::parse)
             ?.let { (x, y, plane) -> WorldTile(x, y, plane) }
         val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel, savedChopSpot)
@@ -137,14 +138,11 @@ class AccountBuilderScript : TribotScript {
             .copy(shuffleSeed = loaded.shuffleSeed)
             .withTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM, chopTileParam)
 
-    private fun BuildProfile.chopTileParam(): String? =
-        tasks.firstOrNull { it.key == WOODCUTTING_KEY }?.params?.get(CHOP_TILE_PARAM)
-
     // Keeps the last-saved chop anchor unless the player has genuinely relocated (different plane or more
     // than CHOP_TILE_RESAVE_THRESHOLD tiles away), so config saves stay instant while the chop tile only
     // re-persists on a real move rather than on every tree-to-tree step.
     private fun stabilizedChopTile(current: WorldTile?, lastSaved: BuildProfile): String? {
-        val previous = lastSaved.chopTileParam()
+        val previous = lastSaved.getTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM)
         if (current == null) return previous // nothing new to record; keep what we had
         val prev = TileCodec.parse(previous)
         val relocated = prev == null ||

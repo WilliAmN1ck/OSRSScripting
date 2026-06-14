@@ -57,4 +57,17 @@ class BuildProfileTest {
         assertEquals(1, updated.version)
         assertEquals(42L, updated.shuffleSeed)
     }
+
+    @Test
+    fun getTaskParamReadsBackWhatWithTaskParamWrote() {
+        val profile = BuildProfile().withTaskParam("woodcutting", "chopTile", "1,2,0")
+        assertEquals("1,2,0", profile.getTaskParam("woodcutting", "chopTile"))
+    }
+
+    @Test
+    fun getTaskParamReturnsNullForAbsentTaskOrParam() {
+        val profile = BuildProfile(tasks = listOf(TaskConfig("woodcutting", mapOf("trees" to "OAK"))))
+        assertNull(profile.getTaskParam("woodcutting", "chopTile")) // task present, param absent
+        assertNull(profile.getTaskParam("mining", "chopTile")) // task absent
+    }
 }
