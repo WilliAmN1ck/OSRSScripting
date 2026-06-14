@@ -8,22 +8,21 @@ import org.junit.jupiter.api.Test
 class RockTypeTest {
 
     @Test
-    fun matchesByIdRegardlessOfName() {
-        val copperId = RockType.COPPER.ids.first()
-        // Every rock is named "Rocks"; identity is the id, so the name is irrelevant.
-        assertTrue(RockType.COPPER.matches("Rocks", copperId))
-        assertTrue(RockType.COPPER.matches("anything at all", copperId))
+    fun matchesItsOreRockByName() {
+        // Mineable rocks are named per ore ("Copper rocks", …) — matched like trees.
+        assertTrue(RockType.COPPER.matches("Copper rocks", 0))
+        assertTrue(RockType.ADAMANTITE.matches("Adamantite rocks", 0))
     }
 
     @Test
-    fun doesNotMatchAnUnknownId() {
-        assertFalse(RockType.COPPER.matches("Rocks", -1))
+    fun isCaseInsensitive() {
+        assertTrue(RockType.IRON.matches("iron rocks", 0))
     }
 
     @Test
-    fun rocksNeverMatchByName() {
-        // objectNames is empty for rocks, so a name alone never matches.
-        assertFalse(RockType.COAL.matches("Coal", 0))
+    fun doesNotCrossMatchOtherOresOrDepletedRocks() {
+        assertFalse(RockType.COPPER.matches("Tin rocks", 0))
+        assertFalse(RockType.COAL.matches("Rocks", 0)) // a depleted/generic rock is not a specific ore
     }
 
     @Test
@@ -39,10 +38,10 @@ class RockTypeTest {
     }
 
     @Test
-    fun everyOreIsFreeToPlayAndHasAtLeastOneId() {
+    fun everyOreIsFreeToPlayAndHasAName() {
         RockType.values().forEach {
             assertFalse(it.members, it.displayName)
-            assertTrue(it.ids.isNotEmpty(), it.displayName)
+            assertTrue(it.objectNames.isNotEmpty(), it.displayName)
         }
     }
 

@@ -190,11 +190,13 @@ internal class GatheringTask(
     private fun logUnrecognisedResources() {
         val now = System.currentTimeMillis()
         if (now - lastUnknownLogMs < UNKNOWN_LOG_INTERVAL_MS) return
-        val nearby = Query.gameObjects().actionEquals(gatherAction).isReachable.toList()
+        // Log every loaded gather-action object in view (NOT just reachable ones) so the id table can be
+        // captured by just having the mine on-screen — no precise positioning needed.
+        val nearby = Query.gameObjects().actionEquals(gatherAction).toList()
         if (nearby.isEmpty()) return
         lastUnknownLogMs = now
-        val sample = nearby.take(SAMPLE_SIZE).joinToString { "${it.name}#${it.id}" }
-        Log.info("$skillLabel: reachable '$gatherAction' objects not matching the selection — $sample")
+        val sample = nearby.map { "${it.name}#${it.id}" }.distinct().take(SAMPLE_SIZE).joinToString()
+        Log.info("$skillLabel: nearby '$gatherAction' objects (name#id) — $sample")
     }
 
     private companion object {
@@ -205,6 +207,6 @@ internal class GatheringTask(
         const val WITHDRAW_TIMEOUT_MS = 3_000
         const val NO_TOOL_LOG_INTERVAL_MS = 30_000L
         const val UNKNOWN_LOG_INTERVAL_MS = 15_000L
-        const val SAMPLE_SIZE = 10
+        const val SAMPLE_SIZE = 20
     }
 }

@@ -4,29 +4,26 @@ import com.osrsscripts.accountbuilder.engine.GatherResource
 
 /**
  * F2P mineable ore types with their Mining level requirements (per the OSRS Wiki). A [GatherResource]
- * that matches by object **id**: every mineable rock is named "Rocks", so the ore is identified by the
- * game object's id, which varies by mine — hence an id-set per ore ([objectNames] is empty).
- *
- * IMPORTANT: the [ids] below are **PROVISIONAL** best-effort values from web research and MUST be
- * confirmed/extended in-game — Phase 5 sub-phase D logs the reachable mineable rock ids at each covered
- * F2P mine (Al-Kharid primary) and this table is corrected from that capture. Until then, Mining may not
- * locate rocks at every mine.
+ * that matches by object **name** — confirmed in-game, mineable rocks are named per ore ("Copper rocks",
+ * "Tin rocks", …), not a generic "Rocks", so (exactly like trees) the name identifies the ore and
+ * matching is robust at every mine with no per-mine id table. Exact, case-insensitive name match — a
+ * depleted/generic "Rocks" never matches a specific ore.
  */
 internal enum class RockType(
     override val displayName: String,
     override val levelReq: Int,
-    override val ids: Set<Int>,
+    override val objectNames: Set<String>,
 ) : GatherResource {
-    COPPER("Copper", 1, setOf(2090, 2091)),
-    TIN("Tin", 1, setOf(2094, 2095)),
-    IRON("Iron", 15, setOf(2092, 2093)),
-    SILVER("Silver", 20, setOf(2100, 2101)),
-    COAL("Coal", 30, setOf(2096, 2097)),
-    GOLD("Gold", 40, setOf(2098, 2099)),
-    MITHRIL("Mithril", 55, setOf(2102, 2103)),
-    ADAMANTITE("Adamantite", 70, setOf(2104, 2105));
+    COPPER("Copper", 1, setOf("Copper rocks")),
+    TIN("Tin", 1, setOf("Tin rocks")),
+    IRON("Iron", 15, setOf("Iron rocks")),
+    SILVER("Silver", 20, setOf("Silver rocks")),
+    COAL("Coal", 30, setOf("Coal rocks")),
+    GOLD("Gold", 40, setOf("Gold rocks")),
+    MITHRIL("Mithril", 55, setOf("Mithril rocks")),
+    ADAMANTITE("Adamantite", 70, setOf("Adamantite rocks"));
 
     override val id: String get() = name
     override val members: Boolean = false
-    override val objectNames: Set<String> = emptySet()
+    override val ids: Set<Int> = emptySet()
 }
