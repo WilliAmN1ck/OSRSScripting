@@ -27,11 +27,13 @@ internal class GatherConfigPanel(
     private val resourceParamKey: String,
     initialLevel: Int,
     defaultSelected: Set<String> = emptySet(),
+    defaultEnabled: Boolean = false,
 ) : JPanel(GridBagLayout()) {
 
     @Volatile
     private var skillLevel: Int = initialLevel
     private val checkBoxes = LinkedHashMap<GatherResource, JCheckBox>()
+    private val enabledBox = JCheckBox("Train this skill", defaultEnabled)
     private val levelLabel = JLabel()
     private val targetField = JTextField("99", 3)
 
@@ -44,6 +46,11 @@ internal class GatherConfigPanel(
             insets = Insets(2, 4, 2, 4)
         }
         var row = 0
+
+        // Per-skill on/off: only enabled skills are scheduled, so this is the skill's start/stop.
+        enabledBox.toolTipText = "When on, the build trains $skillLabel; when off, this skill is skipped"
+        c.gridy = row++
+        add(enabledBox, c)
 
         levelLabel.text = levelText()
         c.gridy = row++
@@ -70,6 +77,9 @@ internal class GatherConfigPanel(
             .filter { (resource, box) -> box.isSelected && skillLevel >= resource.levelReq }
             .map { it.key }
             .toSet()
+
+    /** Whether this skill is enabled for training (its "Train this skill" toggle). */
+    fun isTrainingEnabled(): Boolean = enabledBox.isSelected
 
     /** The user's target level (1-99); defaults to 99 on invalid input. */
     fun targetLevel(): Int =
@@ -105,13 +115,22 @@ internal class GatherConfigPanel(
         checkBoxes[resource]?.isSelected = checked
     }
 
+    /** Test hook: toggle the skill's enabled state without a display. */
+    internal fun setTrainingEnabled(enabled: Boolean) {
+        enabledBox.isSelected = enabled
+    }
+
     /**
      * Snapshots the current selection + target as a persistable profile. Uses the raw checkbox state
      * (including pre-checked locked resources) so a hands-off build survives a restart.
      */
     fun toProfile(): BuildProfile {
         val selected = checkBoxes.filterValues { it.isSelected }.keys.joinToString(",") { it.id }
-        val params = mapOf(resourceParamKey to selected, TARGET_PARAM to targetField.text.trim())
+        val params = mapOf(
+            ENABLED_PARAM to enabledBox.isSelected.toString(),
+            resourceParamKey to selected,
+            TARGET_PARAM to targetField.text.trim(),
+        )
         return BuildProfile(tasks = listOf(TaskConfig(taskKey, params)))
     }
 
@@ -121,12 +140,14 @@ internal class GatherConfigPanel(
      */
     fun applyProfile(profile: BuildProfile) {
         val config = profile.tasks.firstOrNull { it.key == taskKey } ?: return
+        config.params[ENABLED_PARAM]?.toBooleanStrictOrNull()?.let { enabledBox.isSelected = it }
         val saved = config.params[resourceParamKey]?.split(",")?.toSet() ?: emptySet()
         for ((resource, box) in checkBoxes) box.isSelected = resource.id in saved
         config.params[TARGET_PARAM]?.toIntOrNull()?.let { targetField.text = it.toString() }
     }
 
     private companion object {
+        const val ENABLED_PARAM = "enabled"
         const val TARGET_PARAM = "target"
     }
 }

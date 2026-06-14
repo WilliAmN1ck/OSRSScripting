@@ -9,6 +9,7 @@ internal const val MINING_KEY = "mining"
 
 /** Mining as a [GatheringTask]: mine the selected rocks with a pickaxe. */
 internal fun miningTask(
+    enabled: () -> Boolean,
     allowedRocks: () -> Set<GatherResource>,
     targetLevel: () -> Int,
     initialMineSpot: WorldTile? = null,
@@ -17,6 +18,7 @@ internal fun miningTask(
     skill = Skill.MINING,
     gatherAction = "Mine",
     tool = Picks,
+    enabled = enabled,
     allowedResources = allowedRocks,
     targetLevel = targetLevel,
     initialSpot = initialMineSpot,

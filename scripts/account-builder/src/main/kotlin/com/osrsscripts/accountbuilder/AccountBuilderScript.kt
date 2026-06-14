@@ -48,9 +48,9 @@ class AccountBuilderScript : TribotScript {
         val store = ProfileStore(ScriptSettings.getDefault().directory.toPath().resolve(PROFILE_FILE))
         val savedProfile = store.load()
 
-        // One config tab per skill. Woodcutting pre-selects Normal (preserving the prior single-skill
-        // default); Mining starts with nothing selected, so it is opt-in and a Woodcutting-only user is
-        // unaffected until they tick an ore.
+        // One config tab per skill, each with a "Train this skill" toggle that gates the scheduler.
+        // Woodcutting defaults on (preserving the prior single-skill behaviour) with Normal pre-selected;
+        // Mining defaults off (opt-in), so a Woodcutting-only user is unaffected until they enable it.
         val wcPanel = GatherConfigPanel(
             title = "Trees to cut",
             skillLabel = "Woodcutting",
@@ -59,6 +59,7 @@ class AccountBuilderScript : TribotScript {
             resourceParamKey = WC_RESOURCE_PARAM,
             initialLevel = woodcuttingLevel(),
             defaultSelected = setOf(TreeType.NORMAL.id),
+            defaultEnabled = true,
         )
         val minePanel = GatherConfigPanel(
             title = "Rocks to mine",
@@ -67,14 +68,15 @@ class AccountBuilderScript : TribotScript {
             taskKey = MINING_KEY,
             resourceParamKey = MINE_RESOURCE_PARAM,
             initialLevel = miningLevel(),
+            defaultEnabled = false,
         )
         wcPanel.applyProfile(savedProfile)
         minePanel.applyProfile(savedProfile)
         context.sidebar.addSidebarTab(WC_TAB, null, wcPanel)
         context.sidebar.addSidebarTab(MINE_TAB, null, minePanel)
 
-        val woodcutting = woodcuttingTask({ wcPanel.selectedResources() }, wcPanel::targetLevel, savedSpot(savedProfile, WOODCUTTING_KEY))
-        val mining = miningTask({ minePanel.selectedResources() }, minePanel::targetLevel, savedSpot(savedProfile, MINING_KEY))
+        val woodcutting = woodcuttingTask(wcPanel::isTrainingEnabled, { wcPanel.selectedResources() }, wcPanel::targetLevel, savedSpot(savedProfile, WOODCUTTING_KEY))
+        val mining = miningTask(minePanel::isTrainingEnabled, { minePanel.selectedResources() }, minePanel::targetLevel, savedSpot(savedProfile, MINING_KEY))
         val scheduler = BuilderScheduler(listOf(woodcutting, mining))
         val runner = TaskRunner(listOf(MainBacklogTask(scheduler) { SdkGameView }))
         val skills = listOf(

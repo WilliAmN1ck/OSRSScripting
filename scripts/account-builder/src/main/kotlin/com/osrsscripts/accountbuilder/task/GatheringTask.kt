@@ -32,6 +32,7 @@ internal class GatheringTask(
     private val skill: Skill,
     private val gatherAction: String,
     private val tool: ToolModel,
+    private val enabled: () -> Boolean,
     private val allowedResources: () -> Set<GatherResource>,
     private val targetLevel: () -> Int,
     initialSpot: WorldTile? = null,
@@ -58,11 +59,11 @@ internal class GatheringTask(
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(skill) >= targetLevel()
 
-    // Not runnable with nothing selected. Tool availability is deliberately NOT gated here: when the
-    // player has no tool, execute() actively fetches the best usable one from the bank, so the task must
-    // be allowed to run to do that. ("Nothing selected" surfaces via the scheduler's status line.)
+    // Not runnable unless the skill is enabled (its tab's "Train this skill" toggle) and has something
+    // selected. Tool availability is deliberately NOT gated here: when the player has no tool, execute()
+    // actively fetches the best usable one from the bank, so the task must be allowed to run to do that.
     override fun validate(view: GameView): Boolean =
-        requirements.meets(view) && allowedResources().isNotEmpty()
+        enabled() && requirements.meets(view) && allowedResources().isNotEmpty()
 
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("$skillLabel ${view.skills.level(skill)}/${targetLevel()}")

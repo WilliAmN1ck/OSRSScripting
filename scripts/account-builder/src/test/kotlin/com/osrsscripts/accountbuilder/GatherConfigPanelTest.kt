@@ -17,6 +17,7 @@ class GatherConfigPanelTest {
         resourceParamKey = "trees",
         initialLevel = level,
         defaultSelected = setOf(TreeType.NORMAL.id),
+        defaultEnabled = true,
     )
 
     private fun mining(level: Int) = GatherConfigPanel(
@@ -26,6 +27,7 @@ class GatherConfigPanelTest {
         taskKey = "mining",
         resourceParamKey = "rocks",
         initialLevel = level,
+        defaultEnabled = false,
     )
 
     @Test
@@ -80,5 +82,29 @@ class GatherConfigPanelTest {
     @Test
     fun miningPanelIsOptInWithNothingSelectedByDefault() {
         assertTrue(mining(99).selectedResources().isEmpty())
+    }
+
+    @Test
+    fun trainingTogglesDefaultPerSkill() {
+        assertTrue(woodcutting(1).isTrainingEnabled()) // Woodcutting on by default
+        assertFalse(mining(1).isTrainingEnabled()) // Mining opt-in
+    }
+
+    @Test
+    fun trainingEnabledRoundTripsThroughTheProfile() {
+        val mine = mining(1)
+        mine.setTrainingEnabled(true)
+        assertEquals("true", mine.toProfile().tasks.single { it.key == "mining" }.params["enabled"])
+
+        val restored = mining(1)
+        restored.applyProfile(mine.toProfile())
+        assertTrue(restored.isTrainingEnabled())
+    }
+
+    @Test
+    fun applyingAProfileWithoutThisSkillKeepsTheDefaultEnabledState() {
+        val mine = mining(1)
+        mine.applyProfile(BuildProfile()) // no mining config
+        assertFalse(mine.isTrainingEnabled()) // stays at the opt-in default
     }
 }
