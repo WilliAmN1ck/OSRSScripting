@@ -110,8 +110,8 @@ class AccountBuilderScript : TribotScript {
 
                 val now = Instant.now()
 
-                // Every task done: announce and stop.
-                if (scheduler.allComplete(SdkGameView)) {
+                // No pending runnable goal left (configured skills done): announce and stop.
+                if (scheduler.allDone(SdkGameView)) {
                     context.logger.info("AIO Account Builder: all tasks complete — stopping.")
                     break
                 }
