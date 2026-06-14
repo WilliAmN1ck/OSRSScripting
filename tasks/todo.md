@@ -241,7 +241,7 @@
       the woodcutting TaskConfig params (chopTile="x,y,plane"; TileCodec + BuildProfile.withTaskParam, both
       unit-tested), restored on start to seed WoodcuttingTask.chopSpot → restart/cold-bank-start walks back
       to the trees. Distance-throttled saves (>8 tiles). Review fixes: shared WOODCUTTING_KEY constant +
-      preserve shuffleSeed on save. 61 tests; redeployed, pending live re-verify.
+      preserve shuffleSeed on save + getTaskParam reader symmetry. 63 tests; LIVE-VERIFIED 2026-06-13.
 - [ ] Deferred: paint/stats overlay; SDK fidgets (need sdk-support SdkFidget extraction); MiniBreaks;
       cross-location tree progression; never-chopped cold bank start (needs tree-area navigation);
       next-live-run edge cases (bank PIN, randoms/login).

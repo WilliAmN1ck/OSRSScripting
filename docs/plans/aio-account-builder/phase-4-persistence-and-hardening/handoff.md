@@ -73,9 +73,11 @@ false-stop over 10+ minutes, **build-complete stop** fired cleanly at the target
   bridging is SDK-coupled → live-verified. Saves are **throttled by distance** (`stabilizedChopTile`:
   re-persist only on a >8-tile move or plane change) so config still saves instantly without disk spam.
   Review-driven hardening folded in: the `"woodcutting"` task key is now a single shared `WOODCUTTING_KEY`
-  constant (was a 3-way literal), and the save now preserves the loaded `shuffleSeed` instead of dropping it.
-  **61 tests** green. Limitation: a brand-new account that has never chopped still can't locate trees from a
-  cold bank start (no tree-finding exists).
+  constant (was a 3-way literal), the save preserves the loaded `shuffleSeed` instead of dropping it, and a
+  symmetric `BuildProfile.getTaskParam` reader pairs with `withTaskParam`. **63 tests** green;
+  **LIVE-VERIFIED 2026-06-13** (chop→stop→restart resumes at the trees; stop→walk-to-bank→restart walks
+  back; bank-with-no-axe withdraws and returns). Limitation: a brand-new account that has never chopped
+  still can't locate trees from a cold bank start (no tree-finding exists).
 
 ## Verification Commands
     .\gradlew.bat :scripts:account-builder:test
