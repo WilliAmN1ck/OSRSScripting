@@ -233,7 +233,12 @@
 - [x] Persistence WIRING (branch `account-builder-persistence-wiring`, #26 merged): panel toProfile()/applyProfile()
       ↔ BuildProfile; load on start + save-on-change via ProfileStore in the script-settings dir. 37 tests.
       Resume **LIVE-VERIFIED 2026-06-13** (restart restores Oak/Willow/Yew + target 50).
+- [x] Auto-fetch axe from bank (branch `account-builder-axe-from-bank`): no-axe → walk to nearest bank →
+      withdraw best usable axe (Axes.bestUsableAxe; highest non-degradable tier ≤ WC level; crystal/infernal/
+      3rd-age/gilded skipped). validate() axe gate dropped; execute() acquireAxe() step; deposits to free a
+      slot if full. 50 tests; redeployed, pending live re-verify. Cold bank-start can't auto-find trees (Opt A).
 - [ ] Deferred: paint/stats overlay; SDK fidgets (need sdk-support SdkFidget extraction); MiniBreaks;
-      cross-location tree progression; withdraw-axe-from-bank; next-live-run edge cases (bank PIN, randoms/login).
+      cross-location tree progression; PERSISTENT chop-location (return to trees after a cold bank start);
+      next-live-run edge cases (bank PIN, randoms/login).
 
 ## Phase 4 — Publish / distribution  (later / optional)

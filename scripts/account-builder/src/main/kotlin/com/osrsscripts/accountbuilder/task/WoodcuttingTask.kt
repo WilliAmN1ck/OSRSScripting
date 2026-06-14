@@ -7,14 +7,17 @@ import com.osrsscripts.accountbuilder.engine.Requirements
 import com.osrsscripts.accountbuilder.engine.Skill
 import com.osrsscripts.accountbuilder.engine.TaskKey
 import com.osrsscripts.accountbuilder.engine.TaskProgress
+import com.osrsscripts.accountbuilder.view.SdkGameView
 import org.tribot.script.sdk.Bank
 import org.tribot.script.sdk.Inventory
 import org.tribot.script.sdk.Log
 import org.tribot.script.sdk.MyPlayer
 import org.tribot.script.sdk.Waiting
 import org.tribot.script.sdk.query.Query
+import org.tribot.script.sdk.types.GameObject
 import org.tribot.script.sdk.types.WorldTile
 import org.tribot.script.sdk.util.TribotRandom
+import org.tribot.script.sdk.Skill as SdkSkill
 
 /**
  * Woodcutting as a [BuilderTask]: complete once Woodcutting reaches the target level; otherwise chop
@@ -35,20 +38,27 @@ internal class WoodcuttingTask(
     // starts at the trees, no hardcoded tiles.
     private var chopSpot: WorldTile? = null
 
+    // Throttles the "no usable axe anywhere" warning so a misconfigured run logs once per interval.
+    private var lastNoAxeLogMs = 0L
+
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(Skill.WOODCUTTING) >= targetLevel()
 
-    // Not runnable with no tree selected, or with no axe to chop with — surfaces via the scheduler's
-    // "nothing runnable" path (a single periodic status line) rather than a per-tick warning or, worse,
-    // endlessly clicking a tree the player can never chop.
+    // Not runnable with no tree selected. Axe availability is deliberately NOT gated here: when the
+    // player has no axe, execute() actively fetches the best usable one from the bank, so the task must
+    // be allowed to run to do that. ("No tree selected" still surfaces via the scheduler's status line.)
     override fun validate(view: GameView): Boolean =
-        requirements.meets(view) && allowedTrees().isNotEmpty() && Axes.hasAxe(view)
+        requirements.meets(view) && allowedTrees().isNotEmpty()
 
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("Woodcutting ${view.skills.level(Skill.WOODCUTTING)}/${targetLevel()}")
 
     override fun execute() {
-        if (Inventory.isFull()) bank() else chop()
+        when {
+            !Axes.hasAxe(SdkGameView) -> acquireAxe()
+            Inventory.isFull() -> bank()
+            else -> chop()
+        }
     }
 
     private fun chop() {
@@ -58,22 +68,9 @@ internal class WoodcuttingTask(
         }
         if (MyPlayer.isAnimating()) return // already chopping
 
-        val allowed = allowedTrees()
-        if (allowed.isEmpty()) return // validate() gates this; guards the rare unselect-mid-tick race
+        if (allowedTrees().isEmpty()) return // validate() gates this; guards the rare unselect-mid-tick race
 
-        // Prefer the best (highest-level) qualified tree that's reachable, falling back to lower ones,
-        // so the bot upgrades automatically as Woodcutting levels up.
-        val tree = allowed
-            .sortedByDescending { it.levelReq }
-            .firstNotNullOfOrNull { type ->
-                Query.gameObjects()
-                    .actionEquals("Chop down")
-                    .filter { obj -> type.matches(obj.name) }
-                    .isReachable
-                    .findClosest()
-                    .orElse(null)
-            }
-
+        val tree = findReachableTree()
         if (tree == null) {
             val spot = chopSpot
             if (spot == null) {
@@ -99,7 +96,13 @@ internal class WoodcuttingTask(
                 return
             }
         }
-        // Deposit every non-axe item type explicitly, each with a short, human-like gap.
+        depositNonAxeItems()
+        Bank.close()
+        Waiting.waitUntil(CLOSE_TIMEOUT_MS) { !Bank.isOpen() } // confirm closed before we walk off
+    }
+
+    /** Deposits every non-axe item type explicitly, each with a short, human-like gap. Bank must be open. */
+    private fun depositNonAxeItems() {
         val depositIds = Query.inventory()
             .filter { item -> !Axes.isAxe(item.name) }
             .toList()
@@ -109,8 +112,58 @@ internal class WoodcuttingTask(
             Bank.depositAll(id)
             Waiting.wait(TribotRandom.uniform(DEPOSIT_GAP_MIN_MS, DEPOSIT_GAP_MAX_MS))
         }
+    }
+
+    /**
+     * Fetch the best axe the account can use from the bank when none is held. If we're standing at the
+     * trees (a selected tree is reachable and no spot is remembered yet), remember the spot first so we
+     * can walk back after banking. Then walk to the nearest bank, withdraw the highest-tier axe whose
+     * Woodcutting requirement is met, and close. If the bank holds no usable axe, logs once per interval
+     * and idles — the watchdog backstops a genuinely axe-less setup.
+     */
+    private fun acquireAxe() {
+        if (chopSpot == null && findReachableTree() != null) {
+            chopSpot = MyPlayer.getTile() // at the trees with no axe — remember where to return
+        }
+        if (!Bank.isOpen()) {
+            if (!Bank.ensureOpen()) {
+                Walker.walkToBank() // not at a bank — walk to the nearest (handles stairs), retry next tick
+                return
+            }
+        }
+        val axe = Axes.bestUsableAxe(Bank.getAll().map { it.name }, SdkSkill.WOODCUTTING.getActualLevel())
+        if (axe == null) {
+            logNoUsableAxe()
+            return // leave the bank open and idle; the watchdog stops a genuinely axe-less run
+        }
+        // Free a slot if the pack is full — we hold no axe here, so there's nothing to keep.
+        if (Inventory.isFull()) depositNonAxeItems()
+        if (Bank.withdraw(axe, 1)) {
+            Waiting.waitUntil(WITHDRAW_TIMEOUT_MS) { Axes.hasAxe(SdkGameView) }
+        }
         Bank.close()
-        Waiting.waitUntil(CLOSE_TIMEOUT_MS) { !Bank.isOpen() } // confirm closed before we walk off
+        Waiting.waitUntil(CLOSE_TIMEOUT_MS) { !Bank.isOpen() }
+    }
+
+    /** The best (highest-level) reachable selected tree, or null if none is reachable from here. */
+    private fun findReachableTree(): GameObject? =
+        allowedTrees()
+            .sortedByDescending { it.levelReq }
+            .firstNotNullOfOrNull { type ->
+                Query.gameObjects()
+                    .actionEquals("Chop down")
+                    .filter { obj -> type.matches(obj.name) }
+                    .isReachable
+                    .findClosest()
+                    .orElse(null)
+            }
+
+    private fun logNoUsableAxe() {
+        val now = System.currentTimeMillis()
+        if (now - lastNoAxeLogMs >= NO_AXE_LOG_INTERVAL_MS) {
+            lastNoAxeLogMs = now
+            Log.warn("No usable Woodcutting axe in inventory, equipment, or bank — add one to continue.")
+        }
     }
 
     private companion object {
@@ -118,5 +171,7 @@ internal class WoodcuttingTask(
         const val DEPOSIT_GAP_MIN_MS = 20
         const val DEPOSIT_GAP_MAX_MS = 80
         const val CLOSE_TIMEOUT_MS = 2_000
+        const val WITHDRAW_TIMEOUT_MS = 3_000
+        const val NO_AXE_LOG_INTERVAL_MS = 30_000L
     }
 }

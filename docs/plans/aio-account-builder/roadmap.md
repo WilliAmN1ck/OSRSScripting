@@ -23,6 +23,10 @@ update the relevant line. This exists so the north star is never lost to increme
 ## 2. Skills (1–99, all methods)
 F2P-reachable first. One line per skill; expand into per-method sub-tasks as built.
 - [x] **Woodcutting** — F2P chop→bank→target level. **LIVE-VERIFIED 2026-06-13** (chop, Lumbridge multi-floor bank+return, stop-at-target, hands-off "unlocks at N" progression, 10+ min stable).
+  - [~] Auto-fetch the best usable axe from the bank when none is held (no-axe → walk to nearest bank →
+    withdraw the highest non-degradable tier ≤ WC level; degradable/rare axes skipped). Built + tested;
+    pending live-verify. A cold start *at* a bank can't auto-navigate to trees (no tree-finding yet) — see
+    the persistent-chop-location follow-up.
 - [ ] Attack · [ ] Strength · [ ] Defence · [ ] Hitpoints · [ ] Ranged · [ ] Magic · [ ] Prayer
 - [ ] Mining · [ ] Fishing · [ ] Cooking · [ ] Firemaking · [ ] Smithing · [ ] Crafting
 - [ ] Runecraft · [ ] Agility · [ ] Herblore · [ ] Thieving · [ ] Fletching · [ ] Slayer
