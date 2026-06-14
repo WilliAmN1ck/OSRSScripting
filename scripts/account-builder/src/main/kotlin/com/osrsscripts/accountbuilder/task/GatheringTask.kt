@@ -47,6 +47,9 @@ internal class GatheringTask(
     // Throttles the "no usable tool anywhere" warning so a misconfigured run logs once per interval.
     private var lastNoToolLogMs = 0L
 
+    // Throttles the "resources here aren't recognised" diagnostic (surfaces missing/mismatched ids).
+    private var lastUnknownLogMs = 0L
+
     private val skillLabel = skill.name.lowercase().replaceFirstChar { it.uppercase() }
 
     /** The current gather anchor (for persistence), or null if we've never gathered and none was restored. */
@@ -83,6 +86,7 @@ internal class GatheringTask(
 
         val target = findReachableResource()
         if (target == null) {
+            logUnrecognisedResources() // surface what's actually here if nothing selected matches
             val anchor = spot
             if (anchor == null) {
                 Log.warn("No $skillLabel resource reachable and no spot remembered — start at the resource.")
@@ -177,6 +181,21 @@ internal class GatheringTask(
         }
     }
 
+    /**
+     * When no selected resource is reachable, periodically log the reachable gather-action objects'
+     * `name#id` here. Surfaces a missing or mismatched entry in the resource table (rock ids vary by
+     * mine), and tells the user the spot's resources aren't recognised.
+     */
+    private fun logUnrecognisedResources() {
+        val now = System.currentTimeMillis()
+        if (now - lastUnknownLogMs < UNKNOWN_LOG_INTERVAL_MS) return
+        val nearby = Query.gameObjects().actionEquals(gatherAction).isReachable.toList()
+        if (nearby.isEmpty()) return
+        lastUnknownLogMs = now
+        val sample = nearby.take(SAMPLE_SIZE).joinToString { "${it.name}#${it.id}" }
+        Log.info("$skillLabel: reachable '$gatherAction' objects not matching the selection — $sample")
+    }
+
     private companion object {
         const val GATHER_TIMEOUT_MS = 8_000
         const val DEPOSIT_GAP_MIN_MS = 20
@@ -184,5 +203,7 @@ internal class GatheringTask(
         const val CLOSE_TIMEOUT_MS = 2_000
         const val WITHDRAW_TIMEOUT_MS = 3_000
         const val NO_TOOL_LOG_INTERVAL_MS = 30_000L
+        const val UNKNOWN_LOG_INTERVAL_MS = 15_000L
+        const val SAMPLE_SIZE = 10
     }
 }
