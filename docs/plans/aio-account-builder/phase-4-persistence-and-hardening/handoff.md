@@ -43,7 +43,21 @@ false-stop over 10+ minutes, **build-complete stop** fired cleanly at the target
 "(unlocks at N)" UI** rendered correctly.
 
 ## Known Issues / Queued for the next live run
-- no-axe pre-check; bank PIN handling; random-event / non-break-logout (login handler) behaviour.
+- **no-axe pre-check — DONE** (post-#25 follow-up, see below).
+- **withdraw axe from bank** — axe-in-bank-only is currently a dead-end (idle → watchdog stop); the bot
+  banks but never withdraws an axe. Future capability.
+- bank PIN handling; random-event / non-break-logout (login handler) behaviour.
+
+## Follow-ups (post-#25)
+- **Persistence wiring (#26):** load-on-start / save-on-change wired into `AccountBuilderScript` via
+  `ProfileStore` in the script-settings dir; `AccountBuilderPanel.toProfile()`/`applyProfile()` map the
+  tree selection + target. **Resume LIVE-VERIFIED 2026-06-13** — restart restores Oak/Willow/Yew + target 50.
+- **No-axe runnability guard:** Woodcutting `validate()` now also requires `Axes.hasAxe(view)` — an axe in
+  inventory **or** equipped — via a new read-seam (`GameView.equipment` + `InventoryView.itemNames()`,
+  bound in `SdkGameView` to `Equipment.getAll()` / `Query.inventory()`). An axe-less account is now
+  *not runnable* (scheduler skips it, single "check axe…" status line, clean watchdog stop) instead of
+  spinning on an unchoppable tree or printing the misleading "start at the trees" bank message. The fix
+  also tightened `Axes.isAxe()` to exclude throwing axes (`thrownaxe`). **42 tests** green.
 
 ## Verification Commands
     .\gradlew.bat :scripts:account-builder:test

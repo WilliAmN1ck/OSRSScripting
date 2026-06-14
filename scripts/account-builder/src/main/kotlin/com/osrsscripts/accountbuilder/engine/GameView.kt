@@ -9,6 +9,7 @@ package com.osrsscripts.accountbuilder.engine
 interface GameView {
     val skills: SkillView
     val inventory: InventoryView
+    val equipment: EquipmentView
     val quests: QuestView
     val isMembersWorld: Boolean
 }
@@ -19,7 +20,12 @@ interface SkillView {
 
 interface InventoryView {
     fun contains(itemName: String): Boolean
+    fun itemNames(): List<String>
     fun isFull(): Boolean
+}
+
+interface EquipmentView {
+    fun itemNames(): List<String>
 }
 
 interface QuestView {

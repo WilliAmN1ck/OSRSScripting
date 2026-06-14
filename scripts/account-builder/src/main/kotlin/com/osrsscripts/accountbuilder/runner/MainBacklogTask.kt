@@ -42,7 +42,7 @@ internal class MainBacklogTask(
         val now = System.currentTimeMillis()
         if (now - lastIdleLogMs >= IDLE_LOG_INTERVAL_MS) {
             lastIdleLogMs = now
-            Log.info("Waiting — no task is currently runnable (check tree selection / requirements).")
+            Log.info("Waiting — no task is currently runnable (check axe, tree selection, requirements).")
         }
     }
 

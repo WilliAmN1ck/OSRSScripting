@@ -38,10 +38,11 @@ internal class WoodcuttingTask(
     override fun isComplete(view: GameView): Boolean =
         view.skills.level(Skill.WOODCUTTING) >= targetLevel()
 
-    // Not runnable with no tree selected — surfaces via the scheduler's "nothing runnable" path
-    // (a single periodic status line) rather than a per-tick warning from inside the task.
+    // Not runnable with no tree selected, or with no axe to chop with — surfaces via the scheduler's
+    // "nothing runnable" path (a single periodic status line) rather than a per-tick warning or, worse,
+    // endlessly clicking a tree the player can never chop.
     override fun validate(view: GameView): Boolean =
-        requirements.meets(view) && allowedTrees().isNotEmpty()
+        requirements.meets(view) && allowedTrees().isNotEmpty() && Axes.hasAxe(view)
 
     override fun progress(view: GameView): TaskProgress =
         TaskProgress("Woodcutting ${view.skills.level(Skill.WOODCUTTING)}/${targetLevel()}")
