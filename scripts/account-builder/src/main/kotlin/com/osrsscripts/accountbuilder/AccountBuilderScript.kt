@@ -9,7 +9,7 @@ import com.osrsscripts.accountbuilder.engine.profile.getTaskParam
 import com.osrsscripts.accountbuilder.engine.profile.withTaskParam
 import com.osrsscripts.accountbuilder.runner.MainBacklogTask
 import com.osrsscripts.accountbuilder.task.WOODCUTTING_KEY
-import com.osrsscripts.accountbuilder.task.WoodcuttingTask
+import com.osrsscripts.accountbuilder.task.woodcuttingTask
 import com.osrsscripts.accountbuilder.view.SdkGameView
 import com.osrsscripts.core.humanize.AfkScheduler
 import com.osrsscripts.core.humanize.DelayDistribution
@@ -31,7 +31,7 @@ import kotlin.math.abs
  * Entry point for the AIO Account Builder.
  *
  * Drives a sidebar-configured Woodcutting task through the pure engine ([BuilderScheduler] →
- * [WoodcuttingTask]) on the shared [TaskRunner], with antiban: Echo's action AI, break shadowing,
+ * [GatheringTask]) on the shared [TaskRunner], with antiban: Echo's action AI, break shadowing,
  * a fatigue-scaled loop cadence, and occasional look-away AFKs. Stops when every task is complete,
  * and a [Watchdog] stops the run if no Woodcutting XP is gained for a while (stuck). The task
  * engine, capability seams, and full task catalogue grow in later phases.
@@ -52,7 +52,7 @@ class AccountBuilderScript : TribotScript {
         val savedChopSpot = savedProfile.getTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM)
             ?.let(TileCodec::parse)
             ?.let { (x, y, plane) -> WorldTile(x, y, plane) }
-        val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel, savedChopSpot)
+        val woodcutting = woodcuttingTask({ panel.selectedTrees() }, panel::targetLevel, savedChopSpot)
         val scheduler = BuilderScheduler(listOf(woodcutting))
         val runner = TaskRunner(listOf(MainBacklogTask(scheduler) { SdkGameView }))
 
@@ -111,7 +111,7 @@ class AccountBuilderScript : TribotScript {
                 panel.setWoodcuttingLevel(woodcuttingLevel())
                 // Persist config (trees / target) immediately, and the chop anchor when it relocates, so
                 // a restart returns to the trees without spamming the disk with tree-to-tree jitter.
-                val profile = composeProfile(panel, savedProfile, stabilizedChopTile(woodcutting.currentChopSpot(), lastSavedProfile))
+                val profile = composeProfile(panel, savedProfile, stabilizedChopTile(woodcutting.currentSpot(), lastSavedProfile))
                 if (profile != lastSavedProfile) {
                     runCatching { store.save(profile) }
                         .onFailure { context.logger.warn("Failed to save profile", it) }

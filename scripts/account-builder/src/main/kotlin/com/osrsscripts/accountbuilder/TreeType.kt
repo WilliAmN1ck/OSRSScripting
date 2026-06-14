@@ -1,16 +1,20 @@
 package com.osrsscripts.accountbuilder
 
+import com.osrsscripts.accountbuilder.engine.GatherResource
+
 /**
  * Woodcutting tree types with their level requirements and the exact in-game object names that
  * identify them. Level requirements per the OSRS Wiki. The `members` flag is informational (the UI
- * gates on level; members trees simply are not reachable on a F2P world).
+ * gates on level; members trees simply are not reachable on a F2P world). A [GatherResource] that
+ * matches by object **name** (case-insensitive, exact) — so a yew matches only "Yew" / "Yew tree",
+ * never some other object that merely contains the text.
  */
 internal enum class TreeType(
-    val displayName: String,
-    val levelReq: Int,
-    val members: Boolean,
-    private val objectNames: Set<String>,
-) {
+    override val displayName: String,
+    override val levelReq: Int,
+    override val members: Boolean,
+    override val objectNames: Set<String>,
+) : GatherResource {
     NORMAL("Normal tree", 1, false, setOf("Tree")),
     OAK("Oak", 15, false, setOf("Oak", "Oak tree")),
     WILLOW("Willow", 30, false, setOf("Willow", "Willow tree")),
@@ -21,11 +25,6 @@ internal enum class TreeType(
     MAGIC("Magic", 75, true, setOf("Magic", "Magic tree")),
     REDWOOD("Redwood", 90, true, setOf("Redwood", "Redwood tree"));
 
-    /**
-     * Whether a game object's name is exactly one of this tree's known object names
-     * (case-insensitive). Exact matching avoids cross-matching — e.g. a yew matches only "Yew" /
-     * "Yew tree", never some other object that merely contains the text.
-     */
-    fun matches(objectName: String): Boolean =
-        objectNames.any { it.equals(objectName, ignoreCase = true) }
+    override val id: String get() = name
+    override val ids: Set<Int> = emptySet()
 }
