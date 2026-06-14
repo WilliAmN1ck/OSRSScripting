@@ -2,8 +2,12 @@ package com.osrsscripts.accountbuilder
 
 import com.osrsscripts.accountbuilder.engine.BuilderScheduler
 import com.osrsscripts.accountbuilder.engine.Watchdog
+import com.osrsscripts.accountbuilder.engine.profile.BuildProfile
 import com.osrsscripts.accountbuilder.engine.profile.ProfileStore
+import com.osrsscripts.accountbuilder.engine.profile.TileCodec
+import com.osrsscripts.accountbuilder.engine.profile.withTaskParam
 import com.osrsscripts.accountbuilder.runner.MainBacklogTask
+import com.osrsscripts.accountbuilder.task.WOODCUTTING_KEY
 import com.osrsscripts.accountbuilder.task.WoodcuttingTask
 import com.osrsscripts.accountbuilder.view.SdkGameView
 import com.osrsscripts.core.humanize.AfkScheduler
@@ -15,10 +19,12 @@ import org.tribot.automation.script.ScriptContext
 import org.tribot.script.sdk.Login
 import org.tribot.script.sdk.Skill
 import org.tribot.script.sdk.antiban.Antiban
+import org.tribot.script.sdk.types.WorldTile
 import org.tribot.script.sdk.util.ScriptSettings
 import java.time.Duration
 import java.time.Instant
 import java.util.Random
+import kotlin.math.abs
 
 /**
  * Entry point for the AIO Account Builder.
@@ -36,11 +42,16 @@ class AccountBuilderScript : TribotScript {
         Antiban.setScriptAiAntibanEnabled(true)
 
         val store = ProfileStore(ScriptSettings.getDefault().directory.toPath().resolve(PROFILE_FILE))
+        val savedProfile = store.load()
         val panel = AccountBuilderPanel(woodcuttingLevel())
-        panel.applyProfile(store.load()) // restore the saved tree selection + target level
+        panel.applyProfile(savedProfile) // restore the saved tree selection + target level
         context.sidebar.addSidebarTab(TAB_NAME, null, panel)
 
-        val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel)
+        // Restore the last chop anchor so a restart (or a cold start at a bank) walks back to the trees.
+        val savedChopSpot = savedProfile.chopTileParam()
+            ?.let(TileCodec::parse)
+            ?.let { (x, y, plane) -> WorldTile(x, y, plane) }
+        val woodcutting = WoodcuttingTask(panel::selectedTrees, panel::targetLevel, savedChopSpot)
         val scheduler = BuilderScheduler(listOf(woodcutting))
         val runner = TaskRunner(listOf(MainBacklogTask(scheduler) { SdkGameView }))
 
@@ -50,7 +61,8 @@ class AccountBuilderScript : TribotScript {
         val cadence = DelayDistribution(CADENCE_MIN_MS, CADENCE_MAX_MS, random)
         val afk = AfkScheduler(startedAt, random, AFK_MIN_GAP, AFK_MAX_GAP, AFK_MIN, AFK_MAX)
         val watchdog = Watchdog(STALL_LIMIT_MS)
-        var lastSavedProfile = panel.toProfile()
+        // Seed with the loaded chop anchor so we don't redundantly re-save it on the first tick.
+        var lastSavedProfile = composeProfile(panel, savedProfile, savedChopSpot?.let { TileCodec.format(it.x, it.y, it.plane) })
 
         try {
             while (!Thread.currentThread().isInterrupted) {
@@ -96,8 +108,9 @@ class AccountBuilderScript : TribotScript {
 
                 // Re-gate the tree checkboxes as Woodcutting levels up during the run.
                 panel.setWoodcuttingLevel(woodcuttingLevel())
-                // Persist config changes (tree selection / target) as the user makes them.
-                val profile = panel.toProfile()
+                // Persist config (trees / target) immediately, and the chop anchor when it relocates, so
+                // a restart returns to the trees without spamming the disk with tree-to-tree jitter.
+                val profile = composeProfile(panel, savedProfile, stabilizedChopTile(woodcutting.currentChopSpot(), lastSavedProfile))
                 if (profile != lastSavedProfile) {
                     runCatching { store.save(profile) }
                         .onFailure { context.logger.warn("Failed to save profile", it) }
@@ -117,9 +130,34 @@ class AccountBuilderScript : TribotScript {
     // once the backlog spans multiple skills, or a non-WC task would look like a WC stall.
     private fun woodcuttingXp(): Long = Skill.WOODCUTTING.getXp().toLong()
 
+    // Builds the profile to persist: the panel's config (trees / target) plus the chop-tile anchor,
+    // preserving the loaded shuffleSeed so a save never silently drops a persisted field.
+    private fun composeProfile(panel: AccountBuilderPanel, loaded: BuildProfile, chopTileParam: String?): BuildProfile =
+        panel.toProfile()
+            .copy(shuffleSeed = loaded.shuffleSeed)
+            .withTaskParam(WOODCUTTING_KEY, CHOP_TILE_PARAM, chopTileParam)
+
+    private fun BuildProfile.chopTileParam(): String? =
+        tasks.firstOrNull { it.key == WOODCUTTING_KEY }?.params?.get(CHOP_TILE_PARAM)
+
+    // Keeps the last-saved chop anchor unless the player has genuinely relocated (different plane or more
+    // than CHOP_TILE_RESAVE_THRESHOLD tiles away), so config saves stay instant while the chop tile only
+    // re-persists on a real move rather than on every tree-to-tree step.
+    private fun stabilizedChopTile(current: WorldTile?, lastSaved: BuildProfile): String? {
+        val previous = lastSaved.chopTileParam()
+        if (current == null) return previous // nothing new to record; keep what we had
+        val prev = TileCodec.parse(previous)
+        val relocated = prev == null ||
+            prev.third != current.plane ||
+            maxOf(abs(prev.first - current.x), abs(prev.second - current.y)) > CHOP_TILE_RESAVE_THRESHOLD
+        return if (relocated) TileCodec.format(current.x, current.y, current.plane) else previous
+    }
+
     private companion object {
         const val TAB_NAME = "Account Builder"
         const val PROFILE_FILE = "account-builder-profile.json"
+        const val CHOP_TILE_PARAM = "chopTile"
+        const val CHOP_TILE_RESAVE_THRESHOLD = 8 // tiles; re-persist the anchor only on a real relocation
         const val IDLE_POLL_MS = 2_000L
         const val CADENCE_MIN_MS = 400L
         const val CADENCE_MAX_MS = 900L
